@@ -20,7 +20,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
-  const { activeTab, setActiveTab, currentUser, resetDemoData } = useHrmsStore();
+  const { activeTab, setActiveTab, currentUser, resetDemoData, logout } = useHrmsStore();
   const isEmployee = currentUser.role === 'ROLE_EMPLOYEE';
   const roleBadge = getRoleBadge(currentUser.role);
 
@@ -168,10 +168,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
           )}
         </div>
 
+        {isCollapsed && (
+          <div className="mt-2 pt-2 border-t border-slate-200/60 flex justify-center w-full">
+            <button
+              onClick={logout}
+              aria-label="Sign out"
+              title="Sign out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            >
+              <SignOut weight="bold" className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {!isCollapsed && (
           <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between px-1 w-full">
             <button
-              onClick={() => alert(`Logged out from ${currentUser.fullName}`)}
+              onClick={logout}
               className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-rose-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
             >
               <SignOut weight="bold" className="w-3.5 h-3.5" />

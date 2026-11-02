@@ -1,8 +1,12 @@
 import { apiClient } from './client';
 
 export const authApi = {
-  login: async (credentials: { userName: string; userPwd: string }) => {
-    const res = await apiClient.post('/api/auth/login', credentials);
+  login: async (credentials: { userName: string; password?: string; userPwd?: string }) => {
+    const payload = {
+      userName: credentials.userName,
+      password: credentials.password || credentials.userPwd || '',
+    };
+    const res = await apiClient.post('/api/auth/login', payload);
     return res.data;
   },
   verifyOtp: async (payload: { userName: string; otpCode: string }) => {
@@ -11,6 +15,10 @@ export const authApi = {
   },
   changePassword: async (payload: { userName: string; oldPassword: string; newPassword: string }) => {
     const res = await apiClient.put('/api/auth/change-password', payload);
+    return res.data;
+  },
+  resetPassword: async (payload: { userName: string; newPassword: string }) => {
+    const res = await apiClient.put('/api/auth/reset-password', payload);
     return res.data;
   },
 };

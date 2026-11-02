@@ -16,6 +16,11 @@ import { ROLE_PERSONAS, isRoleAllowedForTab } from '../utils/rbac';
 export type NavTab = 'dashboard' | 'attendance' | 'timesheet' | 'employees' | 'leaves' | 'payroll' | 'reports' | 'profile';
 
 interface HrmsState {
+  // Session & Authentication
+  isAuthenticated: boolean;
+  login: (user: UserAccount, token?: string) => void;
+  logout: () => void;
+
   // Navigation & Role
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
@@ -59,8 +64,29 @@ interface HrmsState {
 
 export const useHrmsStore = create<HrmsState>((set, get) => {
   const initial = getStoredData();
+  const storedAuth = typeof window !== 'undefined' ? localStorage.getItem('hrms_authenticated') : null;
+  const isAuthenticated = storedAuth === null ? true : storedAuth === 'true';
 
   return {
+    isAuthenticated,
+    login: (user, token) => {
+      saveToStorage('hrms_user', user);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hrms_authenticated', 'true');
+        if (token) {
+          localStorage.setItem('hrms_jwt_token', token);
+        }
+      }
+      set({ currentUser: user, isAuthenticated: true, activeTab: 'dashboard' });
+    },
+    logout: () => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hrms_authenticated', 'false');
+        localStorage.removeItem('hrms_jwt_token');
+      }
+      set({ isAuthenticated: false, activeTab: 'dashboard' });
+    },
+
     activeTab: 'dashboard',
     setActiveTab: (tab) => set({ activeTab: tab }),
 

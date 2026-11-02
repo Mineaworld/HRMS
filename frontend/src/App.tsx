@@ -8,6 +8,7 @@ import { AttendancePage } from './pages/AttendancePage';
 import { LeavesPage } from './pages/LeavesPage';
 import { PayrollPage } from './pages/PayrollPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { LoginPage } from './pages/LoginPage';
 import { useHrmsStore } from './store/useHrmsStore';
 import {
   UserCircle,
@@ -18,14 +19,19 @@ import {
   ShieldCheck,
   Key,
   CheckCircle,
+  SignOut,
 } from '@phosphor-icons/react';
 import { getRoleBadge, ROLE_PERMISSIONS } from './utils/rbac';
 
 export const App: React.FC = () => {
-  const { activeTab, setActiveTab, currentUser } = useHrmsStore();
+  const { activeTab, setActiveTab, currentUser, isAuthenticated, logout } = useHrmsStore();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const roleBadge = getRoleBadge(currentUser.role);
   const permissions = ROLE_PERMISSIONS[currentUser.role] || [];
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   const renderActivePage = () => {
     switch (activeTab) {
@@ -125,6 +131,18 @@ export const App: React.FC = () => {
                   </span>
                 ))}
               </div>
+            </div>
+
+            {/* Session Management & Sign Out */}
+            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+              <span className="text-xs text-slate-400">Terminate current session on this device</span>
+              <button
+                onClick={logout}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200 transition-colors shadow-xs focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
+              >
+                <SignOut weight="bold" className="w-4 h-4" />
+                <span>Sign Out of BigBoss</span>
+              </button>
             </div>
           </div>
         );
