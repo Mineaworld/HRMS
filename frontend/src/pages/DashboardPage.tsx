@@ -22,32 +22,45 @@ export const DashboardPage: React.FC = () => {
         <MetricCard
           value="04"
           title="Active Projects"
-          comparison="Projects employee is working on"
+          subtitle="Projects employee is working on"
           icon={Briefcase}
+          accent="blue"
         />
         <MetricCard
-          value="05/08"
+          value={
+            <span>
+              05<span className="text-sm font-normal text-slate-400">/08</span>
+            </span>
+          }
           title="WFH Balance"
-          comparison="This Month"
+          subtitle="This Month"
           icon={House}
+          accent="purple"
         />
         <MetricCard
           value="50"
           title="Tasks Completed"
-          comparison="This Month"
+          subtitle="This Month"
           icon={CheckCircle}
+          accent="green"
         />
         <MetricCard
           value="05"
           title="Leave Balance"
-          comparison="Remaining (YTD)"
+          subtitle="Remaining (YTD)"
           icon={Calendar}
+          accent="orange"
         />
         <MetricCard
-          value="176/hr"
+          value={
+            <span>
+              176<span className="text-sm font-normal text-slate-400">/hr</span>
+            </span>
+          }
           title="Work Hours"
-          comparison="This Month"
+          subtitle="This Month"
           icon={Clock}
+          accent="cyan"
         />
       </div>
 
