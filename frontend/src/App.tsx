@@ -44,7 +44,7 @@ export const App: React.FC = () => {
                 <p className="text-xs font-semibold text-blue-600 font-mono mt-0.5">
                   {currentUser.role}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">Enterprise HR Staff Member</p>
+                <p className="text-xs text-slate-400 mt-1">BigBoss HR Staff Member</p>
               </div>
             </div>
 
@@ -69,7 +69,7 @@ export const App: React.FC = () => {
                 <Buildings weight="duotone" className="w-5 h-5 text-blue-600" />
                 <div>
                   <div className="text-[10px] text-slate-400 uppercase font-semibold">Organization</div>
-                  <div className="font-medium text-slate-800">Software Engineering</div>
+                  <div className="font-medium text-slate-800">BigBoss Engineering</div>
                 </div>
               </div>
 

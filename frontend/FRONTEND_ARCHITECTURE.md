@@ -1,7 +1,7 @@
-# HRMS Frontend Architecture & Technical Specification
+# BigBoss HRMS Frontend Architecture & Technical Specification
 
-> **Project:** Human Resource Management System (HRMS)  
-> **Institution / Class:** SETEC Institute — Class SU (Year 4 Semester 1)  
+> **Project:** BigBoss Human Resource Management System (HRMS)  
+> **Suite:** BigBoss Enterprise HR Suite  
 > **Phase:** Final (Frontend Specification & Gateway Integration Architecture)  
 > **Repository:** [https://github.com/VirakbouthKong/HRMS.git](https://github.com/VirakbouthKong/HRMS.git)  
 > **Branch:** `feature/frontend`  

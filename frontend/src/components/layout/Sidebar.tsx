@@ -47,10 +47,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
             {!isCollapsed && (
               <div className="min-w-0">
                 <span className="text-sm font-bold tracking-tight text-slate-900 block leading-tight">
-                  HRMS Portal
+                  BigBoss
                 </span>
                 <span className="text-[10px] font-medium text-slate-400 block tracking-tight">
-                  Enterprise Suite
+                  HR Management
                 </span>
               </div>
             )}
