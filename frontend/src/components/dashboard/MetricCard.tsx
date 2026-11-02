@@ -38,7 +38,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         <div
           className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${badgeStyle.bg} ${badgeStyle.text}`}
         >
-          <Icon weight="bold" className="w-5 h-5" />
+          <Icon weight="fill" className="w-5 h-5" />
         </div>
       </div>
 

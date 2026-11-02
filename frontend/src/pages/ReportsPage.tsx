@@ -50,7 +50,7 @@ export const ReportsPage: React.FC = () => {
               {employees.length} <span className="text-sm font-normal text-slate-400">Staff</span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Users weight="bold" className="w-5 h-5" />
+              <Users weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -70,7 +70,7 @@ export const ReportsPage: React.FC = () => {
               94.6%
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CalendarCheck weight="bold" className="w-5 h-5" />
+              <CalendarCheck weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -90,7 +90,7 @@ export const ReportsPage: React.FC = () => {
               ${totalPayroll.toLocaleString()}
             </div>
             <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CurrencyCircleDollar weight="bold" className="w-5 h-5" />
+              <CurrencyCircleDollar weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">

@@ -97,7 +97,7 @@ export const EmployeesPage: React.FC = () => {
               {employees.length}
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <UsersThree weight="bold" className="w-5 h-5" />
+              <UsersThree weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -117,7 +117,7 @@ export const EmployeesPage: React.FC = () => {
               {departments.length}
             </div>
             <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <TreeStructure weight="bold" className="w-5 h-5" />
+              <TreeStructure weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -137,7 +137,7 @@ export const EmployeesPage: React.FC = () => {
               {activeCount}
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CheckCircle weight="bold" className="w-5 h-5" />
+              <CheckCircle weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -157,7 +157,7 @@ export const EmployeesPage: React.FC = () => {
               ${avgSalary.toLocaleString()}
             </div>
             <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CurrencyDollar weight="bold" className="w-5 h-5" />
+              <CurrencyDollar weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">

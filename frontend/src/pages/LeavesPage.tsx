@@ -68,7 +68,7 @@ export const LeavesPage: React.FC = () => {
               12<span className="text-sm font-normal text-slate-400">/14d</span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Sun weight="bold" className="w-5 h-5" />
+              <Sun weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -88,7 +88,7 @@ export const LeavesPage: React.FC = () => {
               08<span className="text-sm font-normal text-slate-400">/10d</span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <FirstAid weight="bold" className="w-5 h-5" />
+              <FirstAid weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -108,7 +108,7 @@ export const LeavesPage: React.FC = () => {
               15<span className="text-sm font-normal text-slate-400">/18d</span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Suitcase weight="bold" className="w-5 h-5" />
+              <Suitcase weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -128,7 +128,7 @@ export const LeavesPage: React.FC = () => {
               Request Time Off
             </span>
             <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <PlusCircle weight="bold" className="w-5 h-5" />
+              <PlusCircle weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">

@@ -40,7 +40,7 @@ export const PayrollPage: React.FC = () => {
               ${totalPayrollExpense.toLocaleString()}
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CurrencyDollar weight="bold" className="w-5 h-5" />
+              <CurrencyDollar weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -60,7 +60,7 @@ export const PayrollPage: React.FC = () => {
               ${totalTax.toLocaleString()}
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Receipt weight="bold" className="w-5 h-5" />
+              <Receipt weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -80,7 +80,7 @@ export const PayrollPage: React.FC = () => {
               Batch Payroll Processing
             </span>
             <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <GearSix weight="bold" className="w-5 h-5" />
+              <GearSix weight="fill" className="w-5 h-5" />
             </div>
           </div>
           {canProcess ? (

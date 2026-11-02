@@ -139,7 +139,7 @@ export const AttendancePage: React.FC = () => {
               {presentCount}
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <UserCheck weight="bold" className="w-5 h-5" />
+              <UserCheck weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -159,7 +159,7 @@ export const AttendancePage: React.FC = () => {
               {lateCount}
             </div>
             <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <WarningCircle weight="bold" className="w-5 h-5" />
+              <WarningCircle weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -179,7 +179,7 @@ export const AttendancePage: React.FC = () => {
               {onLeaveCount}
             </div>
             <div className="w-10 h-10 rounded-xl bg-cyan-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CalendarCheck weight="bold" className="w-5 h-5" />
+              <CalendarCheck weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -199,7 +199,7 @@ export const AttendancePage: React.FC = () => {
               {totalOtHours}h
             </div>
             <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <ClockCountdown weight="bold" className="w-5 h-5" />
+              <ClockCountdown weight="fill" className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
