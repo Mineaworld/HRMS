@@ -7,9 +7,11 @@ import {
   ShieldCheck,
   UserCheck,
   User,
+  Key,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
 import { UserRole } from '../../types';
+import { getRoleBadge } from '../../utils/rbac';
 
 interface HeaderProps {
   onRaiseRequestClick?: () => void;
@@ -66,10 +68,27 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
     }
   };
 
-  const roles: { id: UserRole; label: string; icon: any }[] = [
-    { id: 'ROLE_ADMIN', label: 'Administrator', icon: ShieldCheck },
-    { id: 'ROLE_HR', label: 'HR Manager', icon: UserCheck },
-    { id: 'ROLE_EMPLOYEE', label: 'Staff Member', icon: User },
+  const roleBadge = getRoleBadge(currentUser.role);
+
+  const roles: { id: UserRole; label: string; desc: string; icon: any }[] = [
+    {
+      id: 'ROLE_ADMIN',
+      label: 'Administrator',
+      desc: 'Full Governance & Batch Payroll',
+      icon: ShieldCheck,
+    },
+    {
+      id: 'ROLE_HR',
+      label: 'HR Manager',
+      desc: 'Roster, Attendance & Leave Approvals',
+      icon: UserCheck,
+    },
+    {
+      id: 'ROLE_EMPLOYEE',
+      label: 'Staff Member',
+      desc: 'Personal Punch, Leaves & Payslips',
+      icon: User,
+    },
   ];
 
   return (
@@ -103,44 +122,83 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
           </button>
 
-          {/* Role Switcher */}
+          {/* Senior Enterprise RBAC Switcher */}
           <div className="relative">
             <button
               onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
               aria-label="Switch active demonstration role"
               aria-expanded={isRoleDropdownOpen}
               aria-haspopup="true"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:border-slate-300 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>{currentUser.role.replace('ROLE_', '')}</span>
+              <span className={`w-2 h-2 rounded-full ${roleBadge.dotClass} animate-pulse`} />
+              <span className="font-mono text-[11px] tracking-tight font-bold">{roleBadge.shortTag}</span>
               <CaretDown weight="bold" className="w-3 h-3 text-slate-400" />
             </button>
 
             {isRoleDropdownOpen && (
-              <div className="absolute right-0 mt-1 w-44 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
-                <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Switch Role
+              <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-slate-200/80 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Switch RBAC Role
+                  </span>
+                  <span className="text-[10px] text-blue-600 font-mono">Gateway JWT</span>
                 </div>
-                {roles.map((r) => {
-                  const Icon = r.icon;
-                  const isSelected = currentUser.role === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => {
-                        setUserRole(r.id);
-                        setIsRoleDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors ${
-                        isSelected ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Icon weight={isSelected ? 'fill' : 'regular'} className="w-4 h-4 text-slate-500" />
-                      <span>{r.label}</span>
-                    </button>
-                  );
-                })}
+                <div className="p-1 space-y-0.5">
+                  {roles.map((r) => {
+                    const Icon = r.icon;
+                    const isSelected = currentUser.role === r.id;
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => {
+                          setUserRole(r.id);
+                          setIsRoleDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
+                          isSelected
+                            ? 'bg-slate-900 text-white'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <Icon weight={isSelected ? 'fill' : 'duotone'} className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold leading-tight truncate">
+                              {r.label}
+                            </span>
+                            <span
+                              className={`text-[9px] font-mono px-1 rounded uppercase ${
+                                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              {r.id.replace('ROLE_', '')}
+                            </span>
+                          </div>
+                          <p
+                            className={`text-[10px] mt-0.5 leading-tight truncate ${
+                              isSelected ? 'text-slate-300' : 'text-slate-400'
+                            }`}
+                          >
+                            {r.desc}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="px-3.5 pt-2 pb-1 border-t border-slate-100 text-[10px] text-slate-400 flex items-center gap-1.5">
+                  <Key weight="bold" className="w-3 h-3 text-slate-400" />
+                  <span>Authority claims routed via Gateway (:8080)</span>
+                </div>
               </div>
             )}
           </div>

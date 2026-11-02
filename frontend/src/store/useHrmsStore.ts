@@ -11,6 +11,7 @@ import {
   UserRole,
 } from '../types';
 import { getStoredData, saveToStorage, resetAllStorage } from '../mocks/storage';
+import { ROLE_PERSONAS, isRoleAllowedForTab } from '../utils/rbac';
 
 export type NavTab = 'dashboard' | 'attendance' | 'timesheet' | 'employees' | 'leaves' | 'payroll' | 'reports' | 'profile';
 
@@ -46,6 +47,7 @@ interface HrmsState {
   // Leave Operations
   submitLeaveRequest: (req: Omit<LeaveRequest, 'leaveId' | 'status' | 'appliedDate'>) => void;
   updateLeaveStatus: (leaveId: number, status: 'APPROVED' | 'REJECTED') => void;
+  cancelLeaveRequest: (leaveId: number) => void;
 
   // Payroll Operations
   generateMonthlyPayroll: (periodMonth: string) => void;
@@ -65,9 +67,24 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     currentUser: initial.user,
     setUserRole: (role) => {
       set((state) => {
-        const updatedUser = { ...state.currentUser, role };
+        const persona = ROLE_PERSONAS[role];
+        const updatedUser: UserAccount = {
+          ...state.currentUser,
+          role,
+          fullName: persona ? persona.fullName : state.currentUser.fullName,
+          email: persona ? persona.email : state.currentUser.email,
+          avatarUrl: persona ? persona.avatarUrl : state.currentUser.avatarUrl,
+          employeeId: persona ? persona.employeeId : state.currentUser.employeeId,
+        };
         saveToStorage('hrms_user', updatedUser);
-        return { currentUser: updatedUser };
+
+        // Auto-redirect if tab is not permitted for the new role
+        let nextTab = state.activeTab;
+        if (!isRoleAllowedForTab(role, state.activeTab)) {
+          nextTab = 'dashboard';
+        }
+
+        return { currentUser: updatedUser, activeTab: nextTab };
       });
     },
 
@@ -195,6 +212,14 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         const updated = state.leaves.map((l) =>
           l.leaveId === leaveId ? { ...l, status, approvedBy: approver } : l
         );
+        saveToStorage('hrms_leaves', updated);
+        return { leaves: updated };
+      });
+    },
+
+    cancelLeaveRequest: (leaveId) => {
+      set((state) => {
+        const updated = state.leaves.filter((l) => l.leaveId !== leaveId);
         saveToStorage('hrms_leaves', updated);
         return { leaves: updated };
       });

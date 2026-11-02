@@ -11,14 +11,24 @@ import {
   FirstAid,
   Suitcase,
   PlusCircle,
+  ArrowCounterClockwise,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { LeaveRequest } from '../types';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { hasPermission } from '../utils/rbac';
 
 export const LeavesPage: React.FC = () => {
-  const { leaves, currentUser, submitLeaveRequest, updateLeaveStatus } = useHrmsStore();
+  const { leaves, currentUser, submitLeaveRequest, updateLeaveStatus, cancelLeaveRequest } = useHrmsStore();
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+
+  const canApprove = hasPermission(currentUser.role, 'LEAVE_APPROVE_REJECT');
+  const canViewAll = hasPermission(currentUser.role, 'LEAVE_VIEW_ALL');
+  const myEmployeeId = currentUser.employeeId || 1;
+
+  const displayedLeaves = canViewAll
+    ? leaves
+    : leaves.filter((l) => l.employeeId === myEmployeeId);
 
   const [formData, setFormData] = useState({
     leaveType: 'Casual Leave' as LeaveRequest['leaveType'],
@@ -27,8 +37,6 @@ export const LeavesPage: React.FC = () => {
     daysCount: 1,
     reason: '',
   });
-
-  const canApprove = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_HR';
 
   const handleApply = (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,11 +157,16 @@ export const LeavesPage: React.FC = () => {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CalendarBlank weight="duotone" className="w-5 h-5 text-blue-600" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-              Leave Applications Queue
-            </h2>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                {canViewAll ? 'Leave Applications Queue' : 'My Leave Applications'}
+              </h2>
+              <p className="text-[10px] text-slate-400">
+                {canViewAll ? 'Company-wide time off requests pending review' : `Submitted applications for ${currentUser.fullName}`}
+              </p>
+            </div>
           </div>
-          <span className="text-xs text-slate-400">Total: {leaves.length} applications</span>
+          <span className="text-xs text-slate-400">Total: {displayedLeaves.length} applications</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -166,11 +179,11 @@ export const LeavesPage: React.FC = () => {
                 <th className="py-3 px-6">Reason</th>
                 <th className="py-3 px-6">Applied Date</th>
                 <th className="py-3 px-6">Status</th>
-                {canApprove && <th className="py-3 px-6 text-right">Actions</th>}
+                <th className="py-3 px-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-              {leaves.map((leave) => (
+              {displayedLeaves.map((leave) => (
                 <tr key={leave.leaveId} className="hover:bg-slate-50/60 transition-colors">
                   <td className="py-3.5 px-6 font-semibold text-slate-900">
                     {leave.employeeName}
@@ -204,15 +217,15 @@ export const LeavesPage: React.FC = () => {
                     </span>
                   </td>
 
-                  {canApprove && (
-                    <td className="py-3.5 px-6 text-right">
-                      {leave.status === 'PENDING' ? (
+                  <td className="py-3.5 px-6 text-right">
+                    {canApprove ? (
+                      leave.status === 'PENDING' ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => updateLeaveStatus(leave.leaveId, 'APPROVED')}
                             aria-label={`Approve leave for ${leave.employeeName}`}
                             className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
-                            title="Approve Leave"
+                            title="Approve Leave (HR Clearance)"
                           >
                             <Check weight="bold" className="w-4 h-4" />
                           </button>
@@ -220,7 +233,7 @@ export const LeavesPage: React.FC = () => {
                             onClick={() => updateLeaveStatus(leave.leaveId, 'REJECTED')}
                             aria-label={`Reject leave for ${leave.employeeName}`}
                             className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
-                            title="Reject Leave"
+                            title="Reject Leave (HR Clearance)"
                           >
                             <X weight="bold" className="w-4 h-4" />
                           </button>
@@ -229,9 +242,29 @@ export const LeavesPage: React.FC = () => {
                         <span className="text-[11px] text-slate-400">
                           {leave.approvedBy ? `By ${leave.approvedBy}` : 'Completed'}
                         </span>
-                      )}
-                    </td>
-                  )}
+                      )
+                    ) : (
+                      leave.status === 'PENDING' ? (
+                        <button
+                          onClick={() => {
+                            if (confirm('Cancel this pending leave request?')) {
+                              cancelLeaveRequest(leave.leaveId);
+                            }
+                          }}
+                          aria-label="Cancel pending leave request"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 text-[11px] font-semibold transition-colors"
+                          title="Cancel Application"
+                        >
+                          <ArrowCounterClockwise weight="bold" className="w-3.5 h-3.5" />
+                          <span>Cancel</span>
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">
+                          {leave.status === 'APPROVED' ? 'Approved' : 'Concluded'}
+                        </span>
+                      )
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

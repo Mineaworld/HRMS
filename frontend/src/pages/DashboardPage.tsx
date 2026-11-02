@@ -5,6 +5,7 @@ import {
   CheckCircle,
   Calendar,
   Clock,
+  Sparkle,
 } from '@phosphor-icons/react';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { PendingActionCard } from '../components/dashboard/PendingActionCard';
@@ -13,10 +14,33 @@ import { EventCalendarCard } from '../components/dashboard/EventCalendarCard';
 import { LeaveSummaryChart } from '../components/dashboard/LeaveSummaryChart';
 import { TimesheetSummaryChart } from '../components/dashboard/TimesheetSummaryChart';
 import { AttendanceSummaryChart } from '../components/dashboard/AttendanceSummaryChart';
+import { useHrmsStore } from '../store/useHrmsStore';
+import { getRoleBadge } from '../utils/rbac';
 
 export const DashboardPage: React.FC = () => {
+  const { currentUser } = useHrmsStore();
+  const roleBadge = getRoleBadge(currentUser.role);
+
   return (
     <div className="space-y-6 pb-10">
+      {/* Welcome Banner matching Reference UI */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-extrabold tracking-tight text-slate-900">
+            Welcome Back, <span className="text-blue-600">{currentUser.fullName}</span>! 👋
+          </h2>
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${roleBadge.badgeClass}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${roleBadge.dotClass}`} />
+            <span>{roleBadge.shortTag}</span>
+          </span>
+        </div>
+        <div className="text-xs text-slate-400 font-medium">
+          BigBoss Workforce Command Portal
+        </div>
+      </div>
+
       {/* 1. Top Metrics Row (5 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard

@@ -9,12 +9,17 @@ import {
   Plus,
   UserCheck,
   ClockCountdown,
+  ShieldCheck,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
+import { hasPermission } from '../utils/rbac';
 
 export const AttendancePage: React.FC = () => {
   const { attendance, currentUser, checkInToday, checkOutToday } = useHrmsStore();
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const canViewAll = hasPermission(currentUser.role, 'ATTENDANCE_VIEW_ALL');
+  const myEmployeeId = currentUser.employeeId || 1;
 
   // Live Clock effect
   useEffect(() => {
@@ -24,16 +29,33 @@ export const AttendancePage: React.FC = () => {
 
   const todayStr = currentTime.toISOString().split('T')[0];
   const myRecordToday = attendance.find(
-    (a) => a.employeeId === (currentUser.employeeId || 1) && a.attendanceDate === todayStr
+    (a) => a.employeeId === myEmployeeId && a.attendanceDate === todayStr
   );
 
   const isCheckedIn = Boolean(myRecordToday?.checkIn);
   const isCheckedOut = Boolean(myRecordToday?.checkOut);
 
-  const presentCount = attendance.filter((a) => a.status === 'PRESENT').length;
-  const lateCount = attendance.filter((a) => a.status === 'LATE').length;
-  const onLeaveCount = attendance.filter((a) => a.status === 'ON_LEAVE').length;
-  const totalOtHours = attendance.reduce((sum, a) => sum + (a.otHours || 0), 0);
+  // Scoped attendance records
+  const displayedAttendance = canViewAll
+    ? attendance
+    : attendance.filter((a) => a.employeeId === myEmployeeId);
+
+  // Metrics (Company-wide for Admin/HR vs Personal for Employee)
+  const presentCount = canViewAll
+    ? attendance.filter((a) => a.status === 'PRESENT').length
+    : displayedAttendance.filter((a) => a.status === 'PRESENT').length;
+
+  const lateCount = canViewAll
+    ? attendance.filter((a) => a.status === 'LATE').length
+    : displayedAttendance.filter((a) => a.status === 'LATE').length;
+
+  const onLeaveCount = canViewAll
+    ? attendance.filter((a) => a.status === 'ON_LEAVE').length
+    : displayedAttendance.filter((a) => a.status === 'ON_LEAVE').length;
+
+  const totalOtHours = canViewAll
+    ? attendance.reduce((sum, a) => sum + (a.otHours || 0), 0)
+    : displayedAttendance.reduce((sum, a) => sum + (a.otHours || 0), 0);
 
   return (
     <div className="space-y-6 pb-12">
@@ -144,10 +166,10 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              Present Today
+              {canViewAll ? 'Present Today' : 'My Days Present'}
             </h3>
             <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
-              Checked-in workforce
+              {canViewAll ? 'Checked-in workforce' : 'Personal on-time records'}
             </p>
           </div>
         </div>
@@ -164,10 +186,10 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              Late Arrivals
+              {canViewAll ? 'Late Arrivals' : 'My Late Arrivals'}
             </h3>
             <p className="text-[11px] text-amber-600 mt-0.5 leading-tight font-medium">
-              Grace period exceeded
+              {canViewAll ? 'Grace period exceeded' : 'Past 08:15 AM threshold'}
             </p>
           </div>
         </div>
@@ -184,10 +206,10 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              Approved Leave
+              {canViewAll ? 'Approved Leave' : 'My Leaves Taken'}
             </h3>
             <p className="text-[11px] text-cyan-600 mt-0.5 leading-tight font-medium">
-              Planned absence
+              {canViewAll ? 'Planned company absence' : 'Excused time off'}
             </p>
           </div>
         </div>
@@ -204,10 +226,10 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              Overtime Hours
+              {canViewAll ? 'Overtime Hours' : 'My Overtime'}
             </h3>
             <p className="text-[11px] text-purple-600 mt-0.5 leading-tight font-medium">
-              Logged excess hours
+              {canViewAll ? 'Logged company excess' : 'Eligible for OT pay'}
             </p>
           </div>
         </div>
@@ -218,9 +240,14 @@ export const AttendancePage: React.FC = () => {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CalendarCheck weight="duotone" className="w-5 h-5 text-blue-600" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-              Daily Attendance Records
-            </h2>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                {canViewAll ? 'Daily Attendance Records' : 'My Attendance History'}
+              </h2>
+              <p className="text-[10px] text-slate-400">
+                {canViewAll ? 'Full enterprise attendance audit log' : `Viewing records for ${currentUser.fullName}`}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => alert('Attendance correction request dialog opened')}
@@ -245,7 +272,7 @@ export const AttendancePage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-              {attendance.map((rec) => (
+              {displayedAttendance.map((rec) => (
                 <tr key={rec.attendanceId} className="hover:bg-slate-50/60 transition-colors">
                   <td className="py-3.5 px-6 font-semibold text-slate-900">
                     {rec.employeeName}

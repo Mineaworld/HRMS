@@ -8,9 +8,12 @@ import {
   TreeStructure,
   CheckCircle,
   CurrencyDollar,
+  EyeSlash,
+  ShieldCheck,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { hasPermission } from '../utils/rbac';
 
 export const EmployeesPage: React.FC = () => {
   const { employees, departments, addEmployee, deleteEmployee, currentUser } = useHrmsStore();
@@ -84,7 +87,9 @@ export const EmployeesPage: React.FC = () => {
     });
   };
 
-  const canEdit = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_HR';
+  const canCreate = hasPermission(currentUser.role, 'EMPLOYEE_CREATE');
+  const canViewSalary = hasPermission(currentUser.role, 'EMPLOYEE_VIEW_SALARY');
+  const canDelete = hasPermission(currentUser.role, 'EMPLOYEE_DELETE');
 
   return (
     <div className="space-y-6 pb-12">
@@ -150,25 +155,46 @@ export const EmployeesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Average Compensation */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
-          <div className="flex items-start justify-between">
-            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
-              ${avgSalary.toLocaleString()}
+        {/* Card 4: Average Compensation (Admin/HR) OR Role Clearance (Employee) */}
+        {canViewSalary ? (
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+            <div className="flex items-start justify-between">
+              <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+                ${avgSalary.toLocaleString()}
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                <CurrencyDollar weight="fill" className="w-5 h-5" />
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CurrencyDollar weight="fill" className="w-5 h-5" />
+            <div className="mt-4">
+              <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+                Average Salary
+              </h3>
+              <p className="text-[11px] text-amber-600 mt-0.5 leading-tight font-medium">
+                Monthly compensation base
+              </p>
             </div>
           </div>
-          <div className="mt-4">
-            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              Average Salary
-            </h3>
-            <p className="text-[11px] text-amber-600 mt-0.5 leading-tight font-medium">
-              Monthly compensation base
-            </p>
+        ) : (
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+            <div className="flex items-start justify-between">
+              <div className="text-sm font-bold tracking-tight text-slate-800 leading-snug">
+                Employee Privacy Protocol
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                <ShieldCheck weight="fill" className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-xs font-semibold text-slate-600 tracking-tight leading-snug">
+                Salaries Protected
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-tight font-mono">
+                RBAC Masking Active
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 2. Controls Bar */}
@@ -202,7 +228,7 @@ export const EmployeesPage: React.FC = () => {
           />
         </div>
 
-        {canEdit && (
+        {canCreate && (
           <button
             onClick={() => setIsAddModalOpen(true)}
             aria-label="Open add employee dialog"
@@ -233,10 +259,10 @@ export const EmployeesPage: React.FC = () => {
                 <th className="py-3 px-6">Employee</th>
                 <th className="py-3 px-6">Department</th>
                 <th className="py-3 px-6">Job Title</th>
-                <th className="py-3 px-6">Salary</th>
+                <th className="py-3 px-6">{canViewSalary ? 'Salary' : 'Compensation'}</th>
                 <th className="py-3 px-6">Status</th>
                 <th className="py-3 px-6">Hire Date</th>
-                {canEdit && <th className="py-3 px-6 text-right">Actions</th>}
+                {canDelete && <th className="py-3 px-6 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -261,8 +287,15 @@ export const EmployeesPage: React.FC = () => {
                   </td>
                   <td className="py-3.5 px-6 font-medium">{emp.departmentName}</td>
                   <td className="py-3.5 px-6 text-slate-600">{emp.jobTitle}</td>
-                  <td className="py-3.5 px-6 font-mono font-semibold text-slate-900">
-                    ${emp.salary.toLocaleString()}
+                  <td className="py-3.5 px-6 font-mono">
+                    {canViewSalary ? (
+                      <span className="font-semibold text-slate-900">${emp.salary.toLocaleString()}</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-400 text-[11px]">
+                        <EyeSlash weight="bold" className="w-3 h-3 text-slate-400" />
+                        <span>Confidential</span>
+                      </span>
+                    )}
                   </td>
                   <td className="py-3.5 px-6">
                     <span
@@ -280,7 +313,7 @@ export const EmployeesPage: React.FC = () => {
                   <td className="py-3.5 px-6 text-slate-500 font-mono text-[11px]">
                     {emp.hireDate}
                   </td>
-                  {canEdit && (
+                  {canDelete && (
                     <td className="py-3.5 px-6 text-right">
                       <button
                         onClick={() => {
@@ -290,7 +323,7 @@ export const EmployeesPage: React.FC = () => {
                         }}
                         aria-label={`Delete employee ${emp.firstName} ${emp.lastName}`}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
-                        title="Delete Employee"
+                        title="Delete Employee (Admin Clearance)"
                       >
                         <Trash weight="bold" className="w-4 h-4" />
                       </button>

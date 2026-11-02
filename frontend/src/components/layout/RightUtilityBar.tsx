@@ -10,20 +10,24 @@ import {
   FileText,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
+import { isRoleAllowedForTab } from '../../utils/rbac';
 
 export const RightUtilityBar: React.FC = () => {
-  const { activeTab, setActiveTab } = useHrmsStore();
+  const { activeTab, setActiveTab, currentUser } = useHrmsStore();
+  const isEmployee = currentUser.role === 'ROLE_EMPLOYEE';
 
-  const utilityItems = [
+  const rawUtilityItems = [
     { id: 'profile' as NavTab, label: 'Profile', icon: UserCircle },
-    { id: 'leaves' as NavTab, label: 'Leave', icon: CalendarCheck },
-    { id: 'attendance' as NavTab, label: 'Attendance', icon: Clock },
+    { id: 'leaves' as NavTab, label: isEmployee ? 'My Leave' : 'Leave', icon: CalendarCheck },
+    { id: 'attendance' as NavTab, label: isEmployee ? 'Punch' : 'Attendance', icon: Clock },
     { id: 'timesheet' as NavTab, label: 'Timesheet', icon: ClockCountdown },
-    { id: 'employees' as NavTab, label: 'Organization', icon: TreeStructure },
-    { id: 'payroll' as NavTab, label: 'Performance', icon: ChartLineUp },
+    { id: 'employees' as NavTab, label: isEmployee ? 'Directory' : 'Organization', icon: TreeStructure },
+    { id: 'payroll' as NavTab, label: isEmployee ? 'Payslip' : 'Payroll', icon: ChartLineUp },
     { id: 'attendance' as NavTab, label: 'Shift', icon: ArrowsClockwise },
     { id: 'reports' as NavTab, label: 'Reports', icon: FileText },
   ];
+
+  const utilityItems = rawUtilityItems.filter((item) => isRoleAllowedForTab(currentUser.role, item.id));
 
   return (
     <aside

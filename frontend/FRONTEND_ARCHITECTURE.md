@@ -153,7 +153,55 @@ To build this polished UI without generic defaults, here is the component breakd
 
 ---
 
-## 6. Migration Guide to Live API Gateway
+## 6. Enterprise Role-Based Access Control (RBAC) & Spring Cloud Gateway Model
+
+### 6.1 Authority & Claims Architecture
+
+The frontend security model strictly mirrors Spring Security 6 with `@EnableMethodSecurity` and Spring Cloud Gateway (`:8080`).
+
+When authenticating via Auth Service, the issued JWT contains authorities mapped via `JwtAuthenticationConverter`:
+- `ROLE_ADMIN`: Executive Administrator with full system governance, employee deletion, and company-wide batch payroll generation.
+- `ROLE_HR`: People Operations Manager with employee directory management, attendance oversight, and leave request approval authority.
+- `ROLE_EMPLOYEE`: Self-service staff member with personal punch clock, personal leave applications, and individual salary advice.
+
+### 6.2 Gateway Route & Authority Mapping Table
+
+| Endpoint Pattern | Method | Target Microservice | Required Authority (`@PreAuthorize`) | Permitted Frontend Roles |
+| :--- | :--- | :--- | :--- | :--- |
+| `/api/employees` | `GET` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+| `/api/employees` | `POST` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+| `/api/employees/{id}` | `DELETE` | Operation Service (`:8083`) | `hasRole('ADMIN')` | `ROLE_ADMIN` |
+| `/api/attendance/check-in` | `POST` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')` | All Roles |
+| `/api/attendance/check-out` | `POST` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')` | All Roles |
+| `/api/attendance/me` | `GET` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')` | All Roles (Self-scoped) |
+| `/api/attendance` | `GET` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+| `/api/leaves` | `POST` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')` | All Roles |
+| `/api/leaves/me` | `GET` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')` | All Roles (Self-scoped) |
+| `/api/leaves/{id}/approve` | `PATCH` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+| `/api/leaves/{id}/reject` | `PATCH` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+| `/api/leaves/{id}/cancel` | `PATCH` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')` | All Roles (Personal application) |
+| `/api/payroll/me` | `GET` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')` | All Roles (Self-scoped) |
+| `/api/payroll/generate` | `POST` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+| `/api/payroll` | `GET` | Operation Service (`:8083`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+| `/api/reports/**` | `GET` | Report Service (`:8084`) | `hasAnyRole('ADMIN', 'HR_MANAGER')` | `ROLE_ADMIN`, `ROLE_HR` |
+
+### 6.3 Senior UX Role-Adaptive Presentation Layer
+
+To prevent generic "AI slop" or broken blank screens, the UI gracefully adapts its information architecture:
+1. **Dynamic Navigation Scoping:**
+   - Left Sidebar and Right Utility Bar filter out executive tabs (like Analytics) for `ROLE_EMPLOYEE`.
+   - Tab labels adapt contextually: "Payroll & Salary" becomes "My Payslips", "Leave Management" becomes "My Leaves".
+2. **Confidential Compensation Masking:**
+   - In Employee Directory, salaries of other employees are strictly masked with `Confidential` tags to respect data privacy when viewed by non-HR staff.
+3. **Action Gating:**
+   - In Leaves: Employees see their personal submission queue with a "Cancel" action for pending requests; HR/Admin see the company approval queue with "Approve" and "Reject" buttons.
+   - In Payroll: Employees see their individual compensation card and printable pay advice; HR/Admin see the batch payroll generator and company financial aggregates.
+4. **Clearance Barrier (`ClearanceRequiredCard`):**
+   - Direct access to unauthorized routes renders a stylish, informative clearance card with exact HTTP 403 Gateway diagnostic details and one-click role switching for live presentations.
+
+---
+
+## 7. Migration Guide to Live API Gateway
 
 When the backend team deploys the Spring Cloud API Gateway at `http://localhost:8080`:
 
@@ -162,5 +210,5 @@ When the backend team deploys the Spring Cloud API Gateway at `http://localhost:
    VITE_USE_MOCK=false
    VITE_API_BASE_URL=http://localhost:8080
    ```
-2. The Axios client automatically points to the gateway with JWT authorization headers attached.
+2. The Axios client automatically points to the gateway with JWT authorization headers attached (`Authorization: Bearer <jwt>`, `X-User-Role`, `X-Employee-Id`).
 3. Because all TypeScript types directly mirror backend entities, no UI component rewrites are needed.

@@ -12,6 +12,7 @@ import {
   Buildings,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
+import { getRoleBadge, isRoleAllowedForTab } from '../../utils/rbac';
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -20,16 +21,36 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
   const { activeTab, setActiveTab, currentUser, resetDemoData } = useHrmsStore();
+  const isEmployee = currentUser.role === 'ROLE_EMPLOYEE';
+  const roleBadge = getRoleBadge(currentUser.role);
 
-  const navItems = [
+  const baseNavItems = [
     { id: 'dashboard' as NavTab, label: 'Dashboard', icon: SquaresFour },
-    { id: 'attendance' as NavTab, label: 'Attendance & Time', icon: Clock },
-    { id: 'employees' as NavTab, label: 'Employees', icon: UsersThree },
-    { id: 'leaves' as NavTab, label: 'Leave Management', icon: CalendarCheck },
-    { id: 'payroll' as NavTab, label: 'Payroll & Salary', icon: CurrencyDollar },
+    {
+      id: 'attendance' as NavTab,
+      label: isEmployee ? 'My Attendance' : 'Attendance & Time',
+      icon: Clock,
+    },
+    {
+      id: 'employees' as NavTab,
+      label: isEmployee ? 'Staff Directory' : 'Employees',
+      icon: UsersThree,
+    },
+    {
+      id: 'leaves' as NavTab,
+      label: isEmployee ? 'My Leaves' : 'Leave Management',
+      icon: CalendarCheck,
+    },
+    {
+      id: 'payroll' as NavTab,
+      label: isEmployee ? 'My Payslips' : 'Payroll & Salary',
+      icon: CurrencyDollar,
+    },
     { id: 'reports' as NavTab, label: 'Analytics', icon: ChartBar },
     { id: 'profile' as NavTab, label: 'My Account', icon: UserCircle },
   ];
+
+  const navItems = baseNavItems.filter((item) => isRoleAllowedForTab(currentUser.role, item.id));
 
   return (
     <aside
@@ -134,8 +155,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
           />
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-semibold text-slate-800 truncate">{currentUser.fullName}</h4>
-              <p className="text-[10px] text-slate-400 truncate font-mono">{currentUser.email}</p>
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-xs font-semibold text-slate-800 truncate">{currentUser.fullName}</h4>
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${roleBadge.dotClass}`} />
+                <span className="text-[10px] font-mono font-medium text-slate-500 uppercase tracking-tight">
+                  {roleBadge.shortTag}
+                </span>
+              </div>
             </div>
           )}
         </div>

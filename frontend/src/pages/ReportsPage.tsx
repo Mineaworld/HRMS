@@ -5,14 +5,73 @@ import {
   Users,
   CalendarCheck,
   CurrencyCircleDollar,
+  LockKey,
+  ShieldCheck,
+  ArrowRight,
+  House,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { LeaveSummaryChart } from '../components/dashboard/LeaveSummaryChart';
 import { AttendanceSummaryChart } from '../components/dashboard/AttendanceSummaryChart';
 import { TimesheetSummaryChart } from '../components/dashboard/TimesheetSummaryChart';
+import { hasPermission } from '../utils/rbac';
 
 export const ReportsPage: React.FC = () => {
-  const { employees, departments, payroll } = useHrmsStore();
+  const { employees, departments, payroll, currentUser, setUserRole, setActiveTab } = useHrmsStore();
+
+  const hasAccess = hasPermission(currentUser.role, 'REPORTS_VIEW_EXECUTIVE');
+
+  if (!hasAccess) {
+    return (
+      <div className="max-w-2xl mx-auto my-12 bg-white/90 backdrop-blur-md rounded-2xl p-8 border border-white/80 shadow-[0_4px_25px_rgba(0,0,0,0.04)] text-center space-y-6 animate-in fade-in duration-200">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60 mx-auto flex items-center justify-center shadow-sm">
+          <LockKey weight="duotone" className="w-8 h-8" />
+        </div>
+
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-[11px] font-mono font-semibold mb-3">
+            <ShieldCheck weight="bold" className="w-3.5 h-3.5 text-blue-600" />
+            <span>ROLE_EMPLOYEE (Clearance Tier 1)</span>
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            Executive Analytics Clearance Required
+          </h2>
+          <p className="text-xs text-slate-500 max-w-md mx-auto mt-2 leading-relaxed">
+            Workforce intelligence summaries, compensation metrics, and department cost reports are restricted to Administrative (<code className="font-mono text-slate-700 font-semibold">ROLE_ADMIN</code>) and HR Leadership (<code className="font-mono text-slate-700 font-semibold">ROLE_HR</code>) authorities.
+          </p>
+        </div>
+
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-left max-w-lg mx-auto text-xs space-y-2">
+          <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+            <span>Gateway Security Policy</span>
+            <span className="font-mono text-[10px] text-rose-600 font-bold">HTTP 403 FORBIDDEN</span>
+          </div>
+          <div className="text-slate-600 text-[11px] font-mono space-y-1">
+            <div><span className="text-slate-400">Target:</span> GET /api/reports/dashboard</div>
+            <div><span className="text-slate-400">Required:</span> hasAnyRole('ADMIN', 'HR_MANAGER')</div>
+            <div><span className="text-slate-400">Caller:</span> {currentUser.fullName} ({currentUser.email})</div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+          >
+            <House weight="bold" className="w-4 h-4" />
+            <span>Back to Dashboard</span>
+          </button>
+          <button
+            onClick={() => setUserRole('ROLE_ADMIN')}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors"
+          >
+            <span>Switch to Admin Persona</span>
+            <ArrowRight weight="bold" className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const totalPayroll = payroll.reduce((acc, p) => acc + p.netSalary, 0);
 

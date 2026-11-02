@@ -9,20 +9,37 @@ import {
   Clock,
   Receipt,
   GearSix,
+  Wallet,
+  ShieldCheck,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { PayrollRecord } from '../types';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { hasPermission } from '../utils/rbac';
 
 export const PayrollPage: React.FC = () => {
   const { payroll, employees, generateMonthlyPayroll, markPayrollPaid, currentUser } = useHrmsStore();
   const [selectedMonth, setSelectedMonth] = useState('January 2026');
   const [viewingPayslip, setViewingPayslip] = useState<PayrollRecord | null>(null);
 
-  const canProcess = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_HR';
+  const canViewAll = hasPermission(currentUser.role, 'PAYROLL_VIEW_ALL');
+  const canGenerate = hasPermission(currentUser.role, 'PAYROLL_GENERATE_BATCH');
+  const canMarkPaid = hasPermission(currentUser.role, 'PAYROLL_MARK_PAID');
+  const myEmployeeId = currentUser.employeeId || 1;
 
+  const displayedPayroll = canViewAll
+    ? payroll
+    : payroll.filter((p) => p.employeeId === myEmployeeId);
+
+  // Aggregates for Admin / HR
   const totalPayrollExpense = payroll.reduce((sum, p) => sum + p.netSalary, 0);
   const totalTax = payroll.reduce((sum, p) => sum + p.taxDeductions, 0);
+
+  // Aggregates for Individual Employee
+  const myLatestSlip = displayedPayroll[0];
+  const myNetSalary = myLatestSlip?.netSalary || 0;
+  const myAllowances = myLatestSlip?.allowances || 0;
+  const myTax = myLatestSlip ? myLatestSlip.taxDeductions + myLatestSlip.lateDeductions : 0;
 
   const handleGenerate = () => {
     generateMonthlyPayroll(selectedMonth);
@@ -33,86 +50,146 @@ export const PayrollPage: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* 1. Summary Cards & Generator Action */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Card 1: Payout */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
-          <div className="flex items-start justify-between">
-            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
-              ${totalPayrollExpense.toLocaleString()}
+        {canViewAll ? (
+          <>
+            {/* Card 1: Payout */}
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+              <div className="flex items-start justify-between">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+                  ${totalPayrollExpense.toLocaleString()}
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <CurrencyDollar weight="fill" className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+                  Total Monthly Payout
+                </h3>
+                <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
+                  Calculated net compensation
+                </p>
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <CurrencyDollar weight="fill" className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              Total Monthly Payout
-            </h3>
-            <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
-              Calculated net compensation
-            </p>
-          </div>
-        </div>
 
-        {/* Card 2: Withholding Tax */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
-          <div className="flex items-start justify-between">
-            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
-              ${totalTax.toLocaleString()}
+            {/* Card 2: Withholding Tax */}
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+              <div className="flex items-start justify-between">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+                  ${totalTax.toLocaleString()}
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Receipt weight="fill" className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+                  Withholding Tax Total
+                </h3>
+                <p className="text-[11px] text-blue-600 mt-0.5 leading-tight font-medium">
+                  Tax compliance withholding
+                </p>
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <Receipt weight="fill" className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              Withholding Tax Total
-            </h3>
-            <p className="text-[11px] text-blue-600 mt-0.5 leading-tight font-medium">
-              Tax compliance withholding
-            </p>
-          </div>
-        </div>
 
-        {/* Card 3: Batch Run */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
-          <div className="flex items-start justify-between">
-            <span className="text-xs font-bold text-slate-800 tracking-tight">
-              Batch Payroll Processing
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <GearSix weight="fill" className="w-5 h-5" />
+            {/* Card 3: Batch Run */}
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+              <div className="flex items-start justify-between">
+                <span className="text-xs font-bold text-slate-800 tracking-tight">
+                  Batch Payroll Processing
+                </span>
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <GearSix weight="fill" className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-3">
+                <BehavioralHistorySelect
+                  label="Payroll Period"
+                  options={[
+                    { value: 'January 2026', label: 'Jan 2026' },
+                    { value: 'February 2026', label: 'Feb 2026' },
+                    { value: 'March 2026', label: 'Mar 2026' },
+                  ]}
+                  value={selectedMonth}
+                  onChange={setSelectedMonth}
+                  storageKey="hrms_payroll_period_history"
+                  selectWidth="130px"
+                  placeholder="Period..."
+                />
+                <button
+                  onClick={handleGenerate}
+                  aria-label="Run monthly payroll calculation"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                >
+                  <Play weight="fill" className="w-3.5 h-3.5" />
+                  <span>Run Payroll</span>
+                </button>
+              </div>
             </div>
-          </div>
-          {canProcess ? (
-            <div className="flex items-center gap-2 mt-3">
-              <BehavioralHistorySelect
-                label="Payroll Period"
-                options={[
-                  { value: 'January 2026', label: 'Jan 2026' },
-                  { value: 'February 2026', label: 'Feb 2026' },
-                  { value: 'March 2026', label: 'Mar 2026' },
-                ]}
-                value={selectedMonth}
-                onChange={setSelectedMonth}
-                storageKey="hrms_payroll_period_history"
-                selectWidth="130px"
-                placeholder="Period..."
-              />
-              <button
-                onClick={handleGenerate}
-                aria-label="Run monthly payroll calculation"
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-              >
-                <Play weight="fill" className="w-3.5 h-3.5" />
-                <span>Run Payroll</span>
-              </button>
+          </>
+        ) : (
+          <>
+            {/* Employee Card 1: My Net Salary */}
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+              <div className="flex items-start justify-between">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+                  ${myNetSalary.toLocaleString()}
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Wallet weight="fill" className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+                  My Monthly Net Payout
+                </h3>
+                <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
+                  Direct deposited to bank
+                </p>
+              </div>
             </div>
-          ) : (
-            <p className="text-xs text-slate-400 mt-2">
-              Admin / HR permissions required to trigger batch runs.
-            </p>
-          )}
-        </div>
+
+            {/* Employee Card 2: My Allowances */}
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+              <div className="flex items-start justify-between">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+                  +${myAllowances.toLocaleString()}
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Receipt weight="fill" className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+                  Monthly Allowances
+                </h3>
+                <p className="text-[11px] text-blue-600 mt-0.5 leading-tight font-medium">
+                  Transport & Meal subsidy
+                </p>
+              </div>
+            </div>
+
+            {/* Employee Card 3: Deductions */}
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+              <div className="flex items-start justify-between">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+                  -${myTax.toLocaleString()}
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <ShieldCheck weight="fill" className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+                  Tax & Deductions
+                </h3>
+                <p className="text-[11px] text-purple-600 mt-0.5 leading-tight font-medium">
+                  Statutory tax withheld
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 2. Payroll Records Table */}
@@ -120,11 +197,18 @@ export const PayrollPage: React.FC = () => {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CurrencyDollar weight="duotone" className="w-5 h-5 text-blue-600" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-              Payroll Records & Slips ({payroll.length})
-            </h2>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                {canViewAll ? 'Payroll Records & Slips' : 'My Compensation & Pay Advice'}
+              </h2>
+              <p className="text-[10px] text-slate-400">
+                {canViewAll ? 'All employee salary distributions' : `Personal payroll advice for ${currentUser.fullName}`}
+              </p>
+            </div>
           </div>
-          <span className="text-xs text-slate-400">Period: {selectedMonth}</span>
+          <span className="text-xs text-slate-400">
+            {canViewAll ? `Period: ${selectedMonth}` : `Employee #${myEmployeeId}`}
+          </span>
         </div>
 
         <div className="overflow-x-auto">
@@ -143,7 +227,7 @@ export const PayrollPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-              {payroll.map((p) => (
+              {displayedPayroll.map((p) => (
                 <tr key={p.recordId} className="hover:bg-slate-50/60 transition-colors">
                   <td className="py-3.5 px-6 font-semibold text-slate-900">
                     <div>{p.employeeName}</div>
@@ -187,7 +271,7 @@ export const PayrollPage: React.FC = () => {
                         <span>Payslip</span>
                       </button>
 
-                      {canProcess && p.status !== 'PAID' && (
+                      {canMarkPaid && p.status !== 'PAID' && (
                         <button
                           onClick={() => markPayrollPaid(p.recordId)}
                           aria-label={`Mark payroll paid for ${p.employeeName}`}

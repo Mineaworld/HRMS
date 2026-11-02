@@ -17,72 +17,96 @@ export const authApi = {
 
 export const employeeApi = {
   getAll: async () => {
-    const res = await apiClient.get('/api/v1/employees');
+    const res = await apiClient.get('/api/employees');
     return res.data;
   },
   getById: async (id: number) => {
-    const res = await apiClient.get(`/api/v1/employees/${id}`);
+    const res = await apiClient.get(`/api/employees/${id}`);
     return res.data;
   },
   create: async (data: any) => {
-    const res = await apiClient.post('/api/v1/employees', data);
+    const res = await apiClient.post('/api/employees', data);
     return res.data;
   },
   update: async (id: number, data: any) => {
-    const res = await apiClient.put(`/api/v1/employees/${id}`, data);
+    const res = await apiClient.patch(`/api/employees/${id}`, data);
     return res.data;
   },
-  delete: async (id: number) => {
-    const res = await apiClient.delete(`/api/v1/employees/${id}`);
+  updateStatus: async (id: number, status: string) => {
+    const res = await apiClient.patch(`/api/employees/${id}/status`, { status });
     return res.data;
   },
 };
 
 export const attendanceApi = {
   getDailyLogs: async (date?: string) => {
-    const res = await apiClient.get('/api/v1/attendance', { params: { date } });
+    const res = await apiClient.get('/api/attendance', { params: { date } });
     return res.data;
   },
-  checkIn: async (employeeId: number) => {
-    const res = await apiClient.post('/api/v1/attendance/check-in', { employeeId });
+  getMyAttendance: async (date?: string) => {
+    const res = await apiClient.get('/api/attendance/me', { params: { date } });
     return res.data;
   },
-  checkOut: async (employeeId: number) => {
-    const res = await apiClient.post('/api/v1/attendance/check-out', { employeeId });
+  checkIn: async () => {
+    const res = await apiClient.post('/api/attendance/check-in');
+    return res.data;
+  },
+  checkOut: async () => {
+    const res = await apiClient.post('/api/attendance/check-out');
     return res.data;
   },
   requestCorrection: async (data: any) => {
-    const res = await apiClient.post('/api/v1/attendance/corrections', data);
+    const res = await apiClient.post('/api/attendance/corrections', data);
     return res.data;
   },
 };
 
 export const leaveApi = {
   getAll: async () => {
-    const res = await apiClient.get('/api/v1/leaves');
+    const res = await apiClient.get('/api/leaves');
+    return res.data;
+  },
+  getMyLeaves: async () => {
+    const res = await apiClient.get('/api/leaves/me');
     return res.data;
   },
   submit: async (data: any) => {
-    const res = await apiClient.post('/api/v1/leaves', data);
+    const res = await apiClient.post('/api/leaves', data);
     return res.data;
   },
-  updateStatus: async (leaveId: number, status: 'APPROVED' | 'REJECTED') => {
-    const res = await apiClient.patch(`/api/v1/leaves/${leaveId}/status`, { status });
+  approve: async (leaveId: number) => {
+    const res = await apiClient.patch(`/api/leaves/${leaveId}/approve`);
+    return res.data;
+  },
+  reject: async (leaveId: number) => {
+    const res = await apiClient.patch(`/api/leaves/${leaveId}/reject`);
+    return res.data;
+  },
+  cancel: async (leaveId: number) => {
+    const res = await apiClient.patch(`/api/leaves/${leaveId}/cancel`);
     return res.data;
   },
 };
 
 export const payrollApi = {
-  getRecords: async (month?: string) => {
-    const res = await apiClient.get('/api/v1/payrolls', { params: { month } });
+  getByPeriod: async (period: string) => {
+    const res = await apiClient.get('/api/payroll', { params: { period } });
     return res.data;
   },
-  generateMonthly: async (month: string) => {
-    const res = await apiClient.post('/api/v1/payrolls/generate', { month });
+  getMyPayrolls: async () => {
+    const res = await apiClient.get('/api/payroll/me');
     return res.data;
   },
-  getPayslip: async (recordId: number) => {
-    const res = await apiClient.get(`/api/v1/payrolls/${recordId}/slip`);
+  generateMonthly: async (period: string) => {
+    const res = await apiClient.post('/api/payroll/generate', { period });
+    return res.data;
+  },
+  setProfile: async (employeeId: number, data: any) => {
+    const res = await apiClient.post(`/api/payroll/profiles/${employeeId}`, data);
+    return res.data;
+  },
+  getProfile: async (employeeId: number) => {
+    const res = await apiClient.get(`/api/payroll/profiles/${employeeId}`);
     return res.data;
   },
 };
