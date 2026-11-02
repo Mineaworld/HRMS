@@ -14,6 +14,7 @@ import {
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { LeaveRequest } from '../types';
+import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
 
 export const LeavesPage: React.FC = () => {
   const { leaves, currentUser, submitLeaveRequest, updateLeaveStatus } = useHrmsStore();
@@ -255,21 +256,24 @@ export const LeavesPage: React.FC = () => {
 
             <form onSubmit={handleApply} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="leaveTypeSelect" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Leave Type
                 </label>
-                <select
-                  id="leaveTypeSelect"
+                <BehavioralHistorySelect
+                  label="Select Leave Type"
+                  options={[
+                    { value: 'Casual Leave', label: 'Casual Leave' },
+                    { value: 'Sick Leave', label: 'Sick Leave' },
+                    { value: 'Birthday / Anniv', label: 'Birthday / Anniversary Leave' },
+                    { value: 'Optional Holiday', label: 'Optional Holiday' },
+                    { value: 'Privilege Leave', label: 'Privilege Leave' },
+                  ]}
                   value={formData.leaveType}
-                  onChange={(e) => setFormData({ ...formData, leaveType: e.target.value as any })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none"
-                >
-                  <option value="Casual Leave">Casual Leave</option>
-                  <option value="Sick Leave">Sick Leave</option>
-                  <option value="Birthday / Anniv">Birthday / Anniversary Leave</option>
-                  <option value="Optional Holiday">Optional Holiday</option>
-                  <option value="Privilege Leave">Privilege Leave</option>
-                </select>
+                  onChange={(val) => setFormData({ ...formData, leaveType: val as any })}
+                  storageKey="hrms_leave_type_history"
+                  selectWidth="100%"
+                  placeholder="Choose leave type..."
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

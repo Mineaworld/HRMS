@@ -17,10 +17,19 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-chart': ['chart.js', 'react-chartjs-2'],
-          'vendor-icons': ['@phosphor-icons/react'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/@radix-ui') || id.includes('node_modules/lucide-react')) {
+            return 'vendor-ui';
+          }
+          if (id.includes('node_modules/chart.js') || id.includes('node_modules/react-chartjs-2')) {
+            return 'vendor-chart';
+          }
+          if (id.includes('node_modules/@phosphor-icons')) {
+            return 'vendor-icons';
+          }
         },
       },
     },

@@ -10,6 +10,7 @@ import {
   CurrencyDollar,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
+import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
 
 export const EmployeesPage: React.FC = () => {
   const { employees, departments, addEmployee, deleteEmployee, currentUser } = useHrmsStore();
@@ -185,19 +186,20 @@ export const EmployeesPage: React.FC = () => {
             />
           </div>
 
-          <select
-            aria-label="Filter by department"
+          <BehavioralHistorySelect
+            options={[
+              { value: 'ALL', label: 'All Departments' },
+              ...departments.map((d) => ({
+                value: d.departmentName,
+                label: d.departmentName,
+              })),
+            ]}
             value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
-          >
-            <option value="ALL">All Departments</option>
-            {departments.map((d) => (
-              <option key={d.departmentId} value={d.departmentName}>
-                {d.departmentName}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedDept}
+            storageKey="hrms_dept_filter_history"
+            selectWidth="200px"
+            placeholder="All Departments"
+          />
         </div>
 
         {canEdit && (
@@ -376,21 +378,21 @@ export const EmployeesPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="empDept" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                     Department
                   </label>
-                  <select
-                    id="empDept"
-                    value={formData.departmentId}
-                    onChange={(e) => setFormData({ ...formData, departmentId: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none"
-                  >
-                    {departments.map((d) => (
-                      <option key={d.departmentId} value={d.departmentId}>
-                        {d.departmentName}
-                      </option>
-                    ))}
-                  </select>
+                  <BehavioralHistorySelect
+                    label="Choose Department"
+                    options={departments.map((d) => ({
+                      value: String(d.departmentId),
+                      label: d.departmentName,
+                    }))}
+                    value={String(formData.departmentId)}
+                    onChange={(val) => setFormData({ ...formData, departmentId: Number(val) })}
+                    storageKey="hrms_emp_dept_history"
+                    selectWidth="100%"
+                    placeholder="Select Department..."
+                  />
                 </div>
                 <div>
                   <label htmlFor="empTitle" className="block text-[11px] font-semibold text-slate-600 mb-1">
@@ -422,19 +424,22 @@ export const EmployeesPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="empGender" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                     Gender
                   </label>
-                  <select
-                    id="empGender"
+                  <BehavioralHistorySelect
+                    label="Select Gender"
+                    options={[
+                      { value: 'Male', label: 'Male' },
+                      { value: 'Female', label: 'Female' },
+                      { value: 'Other', label: 'Other' },
+                    ]}
                     value={formData.gender}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white"
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
+                    onChange={(val) => setFormData({ ...formData, gender: val as any })}
+                    storageKey="hrms_emp_gender_history"
+                    selectWidth="100%"
+                    placeholder="Select Gender..."
+                  />
                 </div>
               </div>
 

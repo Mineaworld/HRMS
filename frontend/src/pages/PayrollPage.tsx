@@ -12,6 +12,7 @@ import {
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { PayrollRecord } from '../types';
+import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
 
 export const PayrollPage: React.FC = () => {
   const { payroll, employees, generateMonthlyPayroll, markPayrollPaid, currentUser } = useHrmsStore();
@@ -84,20 +85,23 @@ export const PayrollPage: React.FC = () => {
           </div>
           {canProcess ? (
             <div className="flex items-center gap-2 mt-3">
-              <select
-                aria-label="Select payroll period month"
+              <BehavioralHistorySelect
+                label="Payroll Period"
+                options={[
+                  { value: 'January 2026', label: 'Jan 2026' },
+                  { value: 'February 2026', label: 'Feb 2026' },
+                  { value: 'March 2026', label: 'Mar 2026' },
+                ]}
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:outline-none"
-              >
-                <option value="January 2026">Jan 2026</option>
-                <option value="February 2026">Feb 2026</option>
-                <option value="March 2026">Mar 2026</option>
-              </select>
+                onChange={setSelectedMonth}
+                storageKey="hrms_payroll_period_history"
+                selectWidth="130px"
+                placeholder="Period..."
+              />
               <button
                 onClick={handleGenerate}
                 aria-label="Run monthly payroll calculation"
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               >
                 <Play weight="fill" className="w-3.5 h-3.5" />
                 <span>Run Payroll</span>
