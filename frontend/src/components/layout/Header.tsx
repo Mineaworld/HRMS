@@ -1,0 +1,204 @@
+import React, { useState } from 'react';
+import {
+  MagnifyingGlass,
+  Bell,
+  CaretDown,
+  Plus,
+  ShieldCheck,
+  UserCheck,
+  User,
+} from '@phosphor-icons/react';
+import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
+import { UserRole } from '../../types';
+
+interface HeaderProps {
+  onRaiseRequestClick?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
+  const { activeTab, currentUser, setUserRole, searchQuery, setSearchQuery } = useHrmsStore();
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [isRaiseDropdownOpen, setIsRaiseDropdownOpen] = useState(false);
+
+  const getSectionTitle = (tab: NavTab) => {
+    switch (tab) {
+      case 'dashboard':
+        return 'Workforce Overview';
+      case 'attendance':
+        return 'Attendance & Punch Records';
+      case 'timesheet':
+        return 'Timesheet Summary';
+      case 'employees':
+        return 'Employee Directory';
+      case 'leaves':
+        return 'Leave Applications';
+      case 'payroll':
+        return 'Payroll & Compensation';
+      case 'reports':
+        return 'Workforce Intelligence';
+      case 'profile':
+        return 'Account Profile';
+      default:
+        return 'Workforce Overview';
+    }
+  };
+
+  const getSectionSubtitle = (tab: NavTab) => {
+    switch (tab) {
+      case 'dashboard':
+        return 'Daily headcount, active tasks, and attendance analytics';
+      case 'attendance':
+        return 'Time tracking, late arrival audit, and overtime logs';
+      case 'timesheet':
+        return 'Weekly hours verification and timesheet statuses';
+      case 'employees':
+        return 'Staff profiles, departmental assignments, and contact data';
+      case 'leaves':
+        return 'Time off requests, allowances balance, and approvals';
+      case 'payroll':
+        return 'Monthly compensation calculation snapshots and payslips';
+      case 'reports':
+        return 'Statistical metrics generated from operational database';
+      case 'profile':
+        return 'Personal credentials and role entitlements';
+      default:
+        return 'Daily workforce status';
+    }
+  };
+
+  const roles: { id: UserRole; label: string; icon: any }[] = [
+    { id: 'ROLE_ADMIN', label: 'Administrator', icon: ShieldCheck },
+    { id: 'ROLE_HR', label: 'HR Manager', icon: UserCheck },
+    { id: 'ROLE_EMPLOYEE', label: 'Staff Member', icon: User },
+  ];
+
+  return (
+    <header className="sticky top-0 z-20 flex flex-col gap-4 px-8 pt-5 pb-4 bg-[#eaf1f7]/90 backdrop-blur-md border-b border-slate-200/60 select-none">
+      {/* Top Utility Bar */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Search */}
+        <div className="relative w-80">
+          <MagnifyingGlass weight="bold" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            aria-label="Search employees, departments, or records"
+            placeholder="Search employees or press /"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-9 py-2 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors"
+          />
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-400 border border-slate-200">
+            /
+          </kbd>
+        </div>
+
+        {/* Right Tools */}
+        <div className="flex items-center gap-2.5">
+          {/* Notifications */}
+          <button
+            aria-label="View notifications"
+            className="relative p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+          >
+            <Bell weight="bold" className="w-4 h-4" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+          </button>
+
+          {/* Role Switcher */}
+          <div className="relative">
+            <button
+              onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+              aria-label="Switch active demonstration role"
+              aria-expanded={isRoleDropdownOpen}
+              aria-haspopup="true"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>{currentUser.role.replace('ROLE_', '')}</span>
+              <CaretDown weight="bold" className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {isRoleDropdownOpen && (
+              <div className="absolute right-0 mt-1 w-44 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
+                <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Switch Role
+                </div>
+                {roles.map((r) => {
+                  const Icon = r.icon;
+                  const isSelected = currentUser.role === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => {
+                        setUserRole(r.id);
+                        setIsRoleDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors ${
+                        isSelected ? 'bg-slate-50 text-slate-900 font-semibold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Icon weight={isSelected ? 'fill' : 'regular'} className="w-4 h-4 text-slate-500" />
+                      <span>{r.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* New Request Button */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                if (onRaiseRequestClick) {
+                  onRaiseRequestClick();
+                } else {
+                  setIsRaiseDropdownOpen(!isRaiseDropdownOpen);
+                }
+              }}
+              aria-label="Create request"
+              aria-expanded={isRaiseDropdownOpen}
+              aria-haspopup="true"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            >
+              <Plus weight="bold" className="w-3.5 h-3.5" />
+              <span>New request</span>
+            </button>
+
+            {isRaiseDropdownOpen && (
+              <div className="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
+                <button
+                  onClick={() => {
+                    setIsRaiseDropdownOpen(false);
+                    if (onRaiseRequestClick) onRaiseRequestClick();
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  Apply for leave
+                </button>
+                <button
+                  onClick={() => {
+                    setIsRaiseDropdownOpen(false);
+                    alert('Attendance correction form opened');
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  Request attendance correction
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Headline & Context */}
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+          {getSectionTitle(activeTab)}
+        </h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {getSectionSubtitle(activeTab)}
+        </p>
+      </div>
+    </header>
+  );
+};
