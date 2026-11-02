@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
                   HRMS Portal
                 </span>
                 <span className="text-[10px] font-medium text-slate-400 block tracking-tight">
-                  SETEC Class SU
+                  Enterprise Suite
                 </span>
               </div>
             )}

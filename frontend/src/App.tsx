@@ -32,7 +32,7 @@ export const App: React.FC = () => {
         return <ReportsPage />;
       case 'profile':
         return (
-          <div className="glass-card rounded-2xl p-8 max-w-2xl mx-auto space-y-6">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-8 max-w-2xl mx-auto space-y-6 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
             <div className="flex items-center gap-5 pb-6 border-b border-slate-100">
               <img
                 src={currentUser.avatarUrl}
@@ -44,7 +44,7 @@ export const App: React.FC = () => {
                 <p className="text-xs font-semibold text-blue-600 font-mono mt-0.5">
                   {currentUser.role}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">SETEC Institute - Class SU Member</p>
+                <p className="text-xs text-slate-400 mt-1">Enterprise HR Staff Member</p>
               </div>
             </div>
 

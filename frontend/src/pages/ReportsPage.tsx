@@ -19,11 +19,11 @@ export const ReportsPage: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       {/* 1. Header with Export Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-2xl p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
         <div>
           <div className="flex items-center gap-2">
             <ChartBar weight="duotone" className="w-5 h-5 text-blue-600" />
-            <h2 className="text-base font-bold text-slate-900">
+            <h2 className="text-base font-bold text-slate-900 tracking-tight">
               Executive Analytics & Reports (Report Service)
             </h2>
           </div>
@@ -43,49 +43,64 @@ export const ReportsPage: React.FC = () => {
 
       {/* 2. Key Intelligence Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-card rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        {/* Card 1: Headcount */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {employees.length} <span className="text-sm font-normal text-slate-400">Staff</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Users weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
               Total Active Headcount
-            </span>
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
-              <Users weight="duotone" className="w-5 h-5" />
-            </div>
+            </h3>
+            <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
+              Across 5 departments
+            </p>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2 font-mono">
-            {employees.length} Staff
-          </div>
-          <div className="text-[11px] text-emerald-600 mt-1">Across 5 departments</div>
         </div>
 
-        <div className="glass-card rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        {/* Card 2: Attendance Rate */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              94.6%
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <CalendarCheck weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
               Avg Attendance Rate
-            </span>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
-              <CalendarCheck weight="duotone" className="w-5 h-5" />
-            </div>
+            </h3>
+            <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
+              +2.4% from last quarter
+            </p>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2 font-mono">
-            94.6%
-          </div>
-          <div className="text-[11px] text-emerald-600 mt-1">+2.4% from last quarter</div>
         </div>
 
-        <div className="glass-card rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Total Monthly Payout
-            </span>
-            <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
-              <CurrencyCircleDollar weight="duotone" className="w-5 h-5" />
+        {/* Card 3: Total Payout */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[120px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              ${totalPayroll.toLocaleString()}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <CurrencyCircleDollar weight="bold" className="w-5 h-5" />
             </div>
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-2 font-mono">
-            ${totalPayroll.toLocaleString()}
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Total Monthly Payout
+            </h3>
+            <p className="text-[11px] text-blue-600 mt-0.5 leading-tight font-medium">
+              Calculated net payroll
+            </p>
           </div>
-          <div className="text-[11px] text-blue-600 mt-1">Calculated net payroll</div>
         </div>
       </div>
 
@@ -103,7 +118,7 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* 4. Department Staffing Table */}
-      <div className="glass-card rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900 tracking-tight">
             Department Headcount & Allocation
@@ -124,10 +139,10 @@ export const ReportsPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {departments.map((d) => (
                 <tr key={d.departmentId} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3 px-6 font-semibold text-slate-900">{d.departmentName}</td>
-                  <td className="py-3 px-6 text-slate-500">{d.description}</td>
-                  <td className="py-3 px-6 font-mono font-medium">{d.headCount} members</td>
-                  <td className="py-3 px-6 text-right font-mono font-semibold text-blue-600">
+                  <td className="py-3.5 px-6 font-semibold text-slate-900">{d.departmentName}</td>
+                  <td className="py-3.5 px-6 text-slate-500">{d.description}</td>
+                  <td className="py-3.5 px-6 font-mono font-medium">{d.headCount} members</td>
+                  <td className="py-3.5 px-6 text-right font-mono font-semibold text-blue-600">
                     {Math.round((d.headCount / 38) * 100)}%
                   </td>
                 </tr>

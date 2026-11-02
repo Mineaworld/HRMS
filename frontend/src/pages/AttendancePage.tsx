@@ -7,6 +7,8 @@ import {
   WarningCircle,
   CheckCircle,
   Plus,
+  UserCheck,
+  ClockCountdown,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 
@@ -28,23 +30,28 @@ export const AttendancePage: React.FC = () => {
   const isCheckedIn = Boolean(myRecordToday?.checkIn);
   const isCheckedOut = Boolean(myRecordToday?.checkOut);
 
+  const presentCount = attendance.filter((a) => a.status === 'PRESENT').length;
+  const lateCount = attendance.filter((a) => a.status === 'LATE').length;
+  const onLeaveCount = attendance.filter((a) => a.status === 'ON_LEAVE').length;
+  const totalOtHours = attendance.reduce((sum, a) => sum + (a.otHours || 0), 0);
+
   return (
     <div className="space-y-6 pb-12">
       {/* 1. Punch Station Card */}
-      <div className="glass-card rounded-2xl p-6 relative overflow-hidden">
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl p-6 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           {/* Live Clock Display */}
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-1">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-600 mb-1">
               <Clock weight="fill" className="w-4 h-4" />
               <span>Real-Time Attendance Punch Station</span>
             </div>
-            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-mono">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums">
               {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
             <div className="text-xs text-slate-500 mt-1">
               {currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              <span className="ml-2 text-slate-400">| Standard Workday: 08:00 - 17:00 (15 min grace)</span>
+              <span className="ml-2 text-slate-400">| Standard Workday: 08:00 - 17:00 (15m grace)</span>
             </div>
           </div>
 
@@ -54,7 +61,7 @@ export const AttendancePage: React.FC = () => {
               onClick={() => checkInToday(currentUser.employeeId || 1)}
               disabled={isCheckedIn}
               aria-label="Check in for today"
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-[background-color,transform] duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 isCheckedIn
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 hover:scale-[1.02]'
@@ -77,7 +84,7 @@ export const AttendancePage: React.FC = () => {
               onClick={() => checkOutToday(currentUser.employeeId || 1)}
               disabled={!isCheckedIn || isCheckedOut}
               aria-label="Check out for today"
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-[background-color,transform] duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 isCheckedOut
                   ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
                   : !isCheckedIn
@@ -123,8 +130,91 @@ export const AttendancePage: React.FC = () => {
         )}
       </div>
 
-      {/* 2. Attendance Daily Logs Table */}
-      <div className="glass-card rounded-2xl overflow-hidden shadow-sm">
+      {/* 2. Attendance Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Present */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {presentCount}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <UserCheck weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Present Today
+            </h3>
+            <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
+              Checked-in workforce
+            </p>
+          </div>
+        </div>
+
+        {/* Late */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {lateCount}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <WarningCircle weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Late Arrivals
+            </h3>
+            <p className="text-[11px] text-amber-600 mt-0.5 leading-tight font-medium">
+              Grace period exceeded
+            </p>
+          </div>
+        </div>
+
+        {/* On Leave */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {onLeaveCount}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-cyan-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <CalendarCheck weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Approved Leave
+            </h3>
+            <p className="text-[11px] text-cyan-600 mt-0.5 leading-tight font-medium">
+              Planned absence
+            </p>
+          </div>
+        </div>
+
+        {/* Overtime */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {totalOtHours}h
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <ClockCountdown weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Overtime Hours
+            </h3>
+            <p className="text-[11px] text-purple-600 mt-0.5 leading-tight font-medium">
+              Logged excess hours
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Attendance Daily Logs Table */}
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CalendarCheck weight="duotone" className="w-5 h-5 text-blue-600" />

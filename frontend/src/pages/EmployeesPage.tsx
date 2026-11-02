@@ -5,6 +5,9 @@ import {
   MagnifyingGlass,
   Trash,
   X,
+  TreeStructure,
+  CheckCircle,
+  CurrencyDollar,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 
@@ -41,6 +44,11 @@ export const EmployeesPage: React.FC = () => {
 
     return matchesSearch && matchesDept;
   });
+
+  const activeCount = employees.filter((e) => e.status === 'Active').length;
+  const avgSalary = Math.round(
+    employees.reduce((sum, e) => sum + e.salary, 0) / (employees.length || 1)
+  );
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,8 +87,91 @@ export const EmployeesPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Controls Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-2xl p-4">
+      {/* 1. Metric Cards Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Staff */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {employees.length}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <UsersThree weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Total Employees
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5 leading-tight truncate">
+              Active company roster
+            </p>
+          </div>
+        </div>
+
+        {/* Departments */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {departments.length}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <TreeStructure weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Departments
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5 leading-tight truncate">
+              Operational divisions
+            </p>
+          </div>
+        </div>
+
+        {/* Active Ratio */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              {activeCount}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <CheckCircle weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Active In Office
+            </h3>
+            <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
+              Currently on duty
+            </p>
+          </div>
+        </div>
+
+        {/* Average Compensation */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+          <div className="flex items-start justify-between">
+            <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
+              ${avgSalary.toLocaleString()}
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <CurrencyDollar weight="bold" className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
+              Average Salary
+            </h3>
+            <p className="text-[11px] text-amber-600 mt-0.5 leading-tight font-medium">
+              Monthly compensation base
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Controls Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
         <div className="flex items-center gap-3 flex-1 max-w-md">
           <div className="relative w-full">
             <MagnifyingGlass weight="bold" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -90,7 +181,7 @@ export const EmployeesPage: React.FC = () => {
               placeholder="Search by name, email, or job title..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
@@ -98,7 +189,7 @@ export const EmployeesPage: React.FC = () => {
             aria-label="Filter by department"
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-medium"
           >
             <option value="ALL">All Departments</option>
             {departments.map((d) => (
@@ -113,7 +204,7 @@ export const EmployeesPage: React.FC = () => {
           <button
             onClick={() => setIsAddModalOpen(true)}
             aria-label="Open add employee dialog"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
             <UserPlus weight="bold" className="w-4 h-4" />
             <span>Add Employee</span>
@@ -121,8 +212,8 @@ export const EmployeesPage: React.FC = () => {
         )}
       </div>
 
-      {/* Employees Table Card */}
-      <div className="glass-card rounded-2xl overflow-hidden shadow-sm">
+      {/* 3. Employees Table Card */}
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <UsersThree weight="duotone" className="w-5 h-5 text-blue-600" />
@@ -210,10 +301,10 @@ export const EmployeesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Employee Modal */}
+      {/* 4. Add Employee Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="glass-card rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-white">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-white">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Add New Employee</h3>
               <button
