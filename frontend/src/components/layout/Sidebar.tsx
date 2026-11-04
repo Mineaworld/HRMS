@@ -70,11 +70,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
       } bg-white border-r border-slate-200/80 shadow-[1px_0_4px_rgba(0,0,0,0.02)] flex-shrink-0`}
     >
       {/* Brand Header */}
-      <div className="flex flex-col flex-1 px-3 py-5 overflow-y-auto">
+      <div
+        className={`flex flex-col flex-1 overflow-y-auto ${
+          isCollapsed ? 'px-2 py-3 no-scrollbar' : 'px-3 py-5'
+        }`}
+      >
         <div
           className={`flex items-center ${
-            isCollapsed ? 'flex-col gap-3 justify-center px-0' : 'justify-between px-2'
-          } mb-6`}
+            isCollapsed ? 'flex-col gap-2 justify-center px-0 mb-3' : 'justify-between px-2 mb-6'
+          }`}
         >
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-900 text-white shadow-sm flex-shrink-0">
@@ -111,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
               Platform
             </span>
           )}
-          <nav className="space-y-1.5" aria-label="Main Navigation">
+          <nav className={isCollapsed ? 'space-y-1' : 'space-y-1.5'} aria-label="Main Navigation">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -153,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
       </div>
 
       {/* User Footer */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50/50 flex flex-col items-center">
+      <div className={`${isCollapsed ? 'p-2' : 'p-3'} border-t border-slate-100 bg-slate-50/50 flex flex-col items-center flex-shrink-0`}>
         <div
           className={`rounded-xl flex items-center ${
             isCollapsed ? 'justify-center p-1' : 'p-2 gap-2.5 w-full'
