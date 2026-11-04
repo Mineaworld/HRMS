@@ -16,6 +16,7 @@ import {
 import { useHrmsStore } from '../store/useHrmsStore';
 import { LeaveRequest } from '../types';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { DatePicker } from '../components/ui/date-picker';
 import { Modal } from '../components/ui/modal';
 import { hasPermission } from '../utils/rbac';
 
@@ -307,26 +308,22 @@ export const LeavesPage: React.FC = () => {
               <label htmlFor="startDateInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
                 Start Date
               </label>
-              <input
+              <DatePicker
                 id="startDateInput"
-                type="date"
-                required
                 value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                onChange={(val) => setFormData({ ...formData, startDate: val })}
+                placeholder="Pick start date"
               />
             </div>
             <div>
               <label htmlFor="endDateInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
                 End Date
               </label>
-              <input
+              <DatePicker
                 id="endDateInput"
-                type="date"
-                required
                 value={formData.endDate}
-                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                onChange={(val) => setFormData({ ...formData, endDate: val })}
+                placeholder="Pick end date"
               />
             </div>
           </div>
