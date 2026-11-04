@@ -13,6 +13,7 @@ import {
   ChartBar,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
+import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
 
 interface CronJobSpec {
   jobName: string;
@@ -201,18 +202,19 @@ export const AutomationsPage: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">Filter:</span>
-            <select
+            <BehavioralHistorySelect
+              selectWidth="210px"
               value={selectedJobFilter}
-              onChange={(e) => setSelectedJobFilter(e.target.value)}
-              className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none"
-            >
-              <option value="ALL">All Scheduled Jobs</option>
-              {CRON_JOBS.map((j) => (
-                <option key={j.jobName} value={j.jobName}>
-                  {j.title}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedJobFilter(val)}
+              options={[
+                { value: 'ALL', label: 'All Scheduled Jobs' },
+                ...CRON_JOBS.map((j) => ({
+                  value: j.jobName,
+                  label: j.title,
+                })),
+              ]}
+              storageKey="hrms_cron_filter_history"
+            />
           </div>
         </div>
 

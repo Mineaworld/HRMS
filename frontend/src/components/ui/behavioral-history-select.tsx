@@ -13,7 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export interface HistoryOption {
-  value: string;
+  value: string | number;
   label: string;
 }
 
@@ -22,12 +22,14 @@ export interface BehavioralHistorySelectProps {
   label?: string;
   placeholder?: string;
   onChange?: (value: string) => void;
-  defaultValue?: string;
-  value?: string;
-  maxHistory?: number; // recent items to remember
-  storageKey?: string; // localStorage key
-  selectWidth?: string | number; // fixed width
+  defaultValue?: string | number;
+  value?: string | number;
+  maxHistory?: number;
+  storageKey?: string;
+  selectWidth?: string | number;
   className?: string;
+  disabled?: boolean;
+  id?: string;
 }
 
 interface StoredHistory {
@@ -44,29 +46,50 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
   defaultValue,
   value,
   maxHistory = 5,
-  storageKey = "behavioral_history_select",
-  selectWidth = "280px",
+  storageKey,
+  selectWidth,
   className,
+  disabled = false,
+  id,
 }) => {
-  const [selected, setSelected] = React.useState(value || defaultValue || "");
+  // Normalize value to string for Radix Select compatibility
+  const normalizedValue = value !== undefined ? String(value) : undefined;
+  const normalizedDefault = defaultValue !== undefined ? String(defaultValue) : undefined;
+
+  const [selected, setSelected] = React.useState<string>(
+    normalizedValue || normalizedDefault || ""
+  );
   const [history, setHistory] = React.useState<StoredHistory[]>([]);
 
   React.useEffect(() => {
-    if (value !== undefined) {
-      setSelected(value);
+    if (normalizedValue !== undefined) {
+      setSelected(normalizedValue);
     }
-  }, [value]);
+  }, [normalizedValue]);
 
-  // Load history from localStorage
+  // Safe localStorage loader with schema validation
   React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        try {
-          setHistory(JSON.parse(stored));
-        } catch {
-          // ignore parsing error
+    if (typeof window !== "undefined" && storageKey) {
+      try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const valid = parsed.filter(
+              (item) =>
+                item &&
+                typeof item.value !== "undefined" &&
+                typeof item.count === "number" &&
+                typeof item.timestamp === "number"
+            );
+            setHistory(valid);
+          } else {
+            localStorage.removeItem(storageKey);
+            setHistory([]);
+          }
         }
+      } catch {
+        setHistory([]);
       }
     }
   }, [storageKey]);
@@ -75,61 +98,96 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
     setSelected(val);
     onChange?.(val);
 
-    setHistory((prev) => {
-      const existing = prev.find((h) => h.value === val);
-      let updated: StoredHistory[];
-      if (existing) {
-        updated = prev.map((h) =>
-          h.value === val
-            ? { ...h, count: h.count + 1, timestamp: Date.now() }
-            : h
-        );
-      } else {
-        updated = [...prev, { value: val, count: 1, timestamp: Date.now() }];
-      }
+    if (storageKey) {
+      setHistory((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+        const existing = safePrev.find((h) => h.value === val);
+        let updated: StoredHistory[];
+        if (existing) {
+          updated = safePrev.map((h) =>
+            h.value === val
+              ? { ...h, count: h.count + 1, timestamp: Date.now() }
+              : h
+          );
+        } else {
+          updated = [...safePrev, { value: val, count: 1, timestamp: Date.now() }];
+        }
 
-      // Sort by frequency & recency
-      updated.sort((a, b) => {
-        if (b.count === a.count) return b.timestamp - a.timestamp;
-        return b.count - a.count;
+        updated.sort((a, b) => {
+          if (b.count === a.count) return b.timestamp - a.timestamp;
+          return b.count - a.count;
+        });
+
+        const limited = updated.slice(0, maxHistory);
+
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(limited));
+          } catch {
+            // ignore storage quota error
+          }
+        }
+
+        return limited;
       });
-
-      // Limit recent history
-      const limited = updated.slice(0, maxHistory);
-
-      if (typeof window !== "undefined") {
-        localStorage.setItem(storageKey, JSON.stringify(limited));
-      }
-
-      return limited;
-    });
+    }
   };
 
-  // Prepare sections
-  const recentItems = history
-    .map((h) => options.find((o) => o.value === h.value))
-    .filter(Boolean) as HistoryOption[];
+  // Convert all options to string value internally
+  const normalizedOptions = React.useMemo(() => {
+    return options.map((opt) => ({
+      value: String(opt.value),
+      label: opt.label,
+    }));
+  }, [options]);
 
-  const otherItems = options.filter((o) => !recentItems.some((r) => r.value === o.value));
+  // Determine recent items if storageKey is active
+  const recentItems = React.useMemo(() => {
+    if (!storageKey || !Array.isArray(history) || history.length === 0) return [];
+    return history
+      .map((h) => normalizedOptions.find((o) => o.value === h.value))
+      .filter(Boolean) as { value: string; label: string }[];
+  }, [storageKey, history, normalizedOptions]);
 
-  const widthStyle = typeof selectWidth === "number" ? `${selectWidth}px` : selectWidth;
+  const otherItems = React.useMemo(() => {
+    if (recentItems.length === 0) return normalizedOptions;
+    return normalizedOptions.filter((o) => !recentItems.some((r) => r.value === o.value));
+  }, [recentItems, normalizedOptions]);
+
+  const isFullWidth = !selectWidth || selectWidth === "100%";
+  const fixedWidthStyle =
+    !isFullWidth && selectWidth
+      ? typeof selectWidth === "number"
+        ? `${selectWidth}px`
+        : selectWidth
+      : undefined;
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <Select value={selected || undefined} defaultValue={defaultValue} onValueChange={handleChange}>
+    <div
+      className={cn("flex flex-col gap-1.5", isFullWidth ? "w-full" : "", className)}
+      style={fixedWidthStyle ? { width: fixedWidthStyle } : undefined}
+    >
+      <Select
+        value={selected || undefined}
+        onValueChange={handleChange}
+        disabled={disabled}
+      >
         <SelectTrigger
-          className="w-full bg-white border-slate-200 text-xs text-slate-800 rounded-xl shadow-sm focus:ring-blue-500/20"
-          style={{ width: widthStyle, minWidth: widthStyle }}
+          id={id}
+          className={cn(
+            "w-full bg-white border-slate-200 text-xs text-slate-800 rounded-xl shadow-sm focus:ring-blue-500/20",
+            disabled && "opacity-50 cursor-not-allowed"
+          )}
+          style={fixedWidthStyle ? { width: fixedWidthStyle, minWidth: fixedWidthStyle } : undefined}
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent
           className="bg-white/95 backdrop-blur-md border-slate-200 shadow-xl rounded-xl"
-          style={{ width: widthStyle }}
         >
           {label && (
             <SelectGroup>
-              <SelectLabel className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1.5">
+              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1.5">
                 {label}
               </SelectLabel>
             </SelectGroup>
@@ -141,17 +199,19 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
                 Recent
               </SelectLabel>
               {recentItems.map((opt) => {
-                const stored = history.find((h) => h.value === opt.value);
+                const stored = Array.isArray(history) ? history.find((h) => h.value === opt.value) : undefined;
                 return (
                   <SelectItem
-                    key={opt.value}
+                    key={`recent-${opt.value}`}
                     value={opt.value}
                     className="flex justify-between items-center w-full text-xs text-slate-700 py-2 cursor-pointer hover:bg-slate-50 focus:bg-blue-50 focus:text-blue-700"
                   >
                     <span>{opt.label}</span>
-                    <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full ml-auto">
-                      {stored?.count}×
-                    </span>
+                    {stored && (
+                      <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full ml-auto">
+                        {stored.count}×
+                      </span>
+                    )}
                   </SelectItem>
                 );
               })}
@@ -160,12 +220,14 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
 
           {otherItems.length > 0 && (
             <SelectGroup>
-              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
-                {recentItems.length > 0 ? "Other Options" : "Options"}
-              </SelectLabel>
+              {recentItems.length > 0 && (
+                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
+                  Other Options
+                </SelectLabel>
+              )}
               {otherItems.map((opt) => (
                 <SelectItem
-                  key={opt.value}
+                  key={`other-${opt.value}`}
                   value={opt.value}
                   className="text-xs text-slate-700 py-2 cursor-pointer hover:bg-slate-50 focus:bg-blue-50 focus:text-blue-700"
                 >

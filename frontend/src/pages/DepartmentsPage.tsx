@@ -16,6 +16,7 @@ import {
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { Department, Employee } from '../types';
+import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
 
 export const DepartmentsPage: React.FC = () => {
   const { departments, employees, addDepartment, updateDepartment, deleteDepartment, currentUser } =
@@ -450,17 +451,16 @@ export const DepartmentsPage: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Department Lead
                   </label>
-                  <select
+                  <BehavioralHistorySelect
+                    placeholder="Choose lead..."
+                    options={employees.map((emp) => ({
+                      value: emp.employeeId,
+                      label: `${emp.firstName} ${emp.lastName}`,
+                    }))}
                     value={formLeadId}
-                    onChange={(e) => setFormLeadId(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none text-slate-800"
-                  >
-                    {employees.map((emp) => (
-                      <option key={emp.employeeId} value={emp.employeeId}>
-                        {emp.firstName} {emp.lastName}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormLeadId(Number(val))}
+                    storageKey="hrms_dept_lead_history"
+                  />
                 </div>
               </div>
 

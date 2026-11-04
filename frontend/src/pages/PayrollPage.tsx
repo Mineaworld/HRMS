@@ -463,10 +463,15 @@ export const PayrollPage: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Target Employee
                 </label>
-                <select
+                <BehavioralHistorySelect
+                  placeholder="Select employee..."
+                  options={employees.map((emp) => ({
+                    value: emp.employeeId,
+                    label: `${emp.firstName} ${emp.lastName} (#${emp.employeeId}) • ${emp.departmentName}`,
+                  }))}
                   value={profileEmpId}
-                  onChange={(e) => {
-                    const id = Number(e.target.value);
+                  onChange={(val) => {
+                    const id = Number(val);
                     setProfileEmpId(id);
                     const emp = employees.find((x) => x.employeeId === id);
                     if (emp) {
@@ -474,14 +479,8 @@ export const PayrollPage: React.FC = () => {
                       setProfilePenaltyPerMin(Number(((emp.salary || 2500) / 22 / 480).toFixed(2)));
                     }
                   }}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
-                >
-                  {employees.map((emp) => (
-                    <option key={emp.employeeId} value={emp.employeeId}>
-                      {emp.firstName} {emp.lastName} (#{emp.employeeId}) • {emp.departmentName}
-                    </option>
-                  ))}
-                </select>
+                  storageKey="hrms_payroll_employee_profile_history"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

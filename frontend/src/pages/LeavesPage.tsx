@@ -275,7 +275,7 @@ export const LeavesPage: React.FC = () => {
       {/* Apply Leave Modal */}
       {isApplyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl w-full max-w-md p-6 shadow-2xl border border-white">
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl w-full max-w-md p-6 shadow-2xl border border-white max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Submit Leave Application</h3>
               <button
@@ -304,7 +304,6 @@ export const LeavesPage: React.FC = () => {
                   value={formData.leaveType}
                   onChange={(val) => setFormData({ ...formData, leaveType: val as any })}
                   storageKey="hrms_leave_type_history"
-                  selectWidth="100%"
                   placeholder="Choose leave type..."
                 />
               </div>
@@ -320,7 +319,7 @@ export const LeavesPage: React.FC = () => {
                     required
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   />
                 </div>
                 <div>
@@ -333,7 +332,7 @@ export const LeavesPage: React.FC = () => {
                     required
                     value={formData.endDate}
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   />
                 </div>
               </div>
@@ -350,7 +349,7 @@ export const LeavesPage: React.FC = () => {
                   required
                   value={formData.daysCount}
                   onChange={(e) => setFormData({ ...formData, daysCount: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
               </div>
 
@@ -365,7 +364,7 @@ export const LeavesPage: React.FC = () => {
                   placeholder="Explain why you are taking leave..."
                   value={formData.reason}
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
               </div>
 
@@ -373,13 +372,13 @@ export const LeavesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsApplyModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-semibold shadow-sm transition-all"
                 >
                   Submit Application
                 </button>
