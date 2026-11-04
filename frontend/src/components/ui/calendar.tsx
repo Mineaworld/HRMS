@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import * as React from "react";
 import { DayPicker } from "react-day-picker";
 
@@ -60,9 +60,9 @@ function Calendar({
   const defaultComponents = {
     Chevron: (props: any) => {
       if (props.orientation === "left") {
-        return <ChevronLeft size={16} strokeWidth={2} {...props} aria-hidden="true" />;
+        return <CaretLeft size={16} weight="bold" {...props} aria-hidden="true" />;
       }
-      return <ChevronRight size={16} strokeWidth={2} {...props} aria-hidden="true" />;
+      return <CaretRight size={16} weight="bold" {...props} aria-hidden="true" />;
     },
   };
 

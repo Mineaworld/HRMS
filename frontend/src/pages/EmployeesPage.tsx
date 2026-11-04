@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { Modal } from '../components/ui/modal';
 import { hasPermission } from '../utils/rbac';
 
 export const EmployeesPage: React.FC = () => {
@@ -337,22 +338,15 @@ export const EmployeesPage: React.FC = () => {
       </div>
 
       {/* 4. Add Employee Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-white">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Add New Employee</h3>
-              <button
-                onClick={() => setIsAddModalOpen(false)}
-                aria-label="Close dialog"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-              >
-                <X weight="bold" className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreate} className="mt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Add New Employee"
+        subtitle="Create enterprise employee profile and assign credentials"
+        maxWidth="lg"
+      >
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="empFirstName" className="block text-[11px] font-semibold text-slate-600 mb-1">
                     First Name
@@ -492,9 +486,7 @@ export const EmployeesPage: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </Modal>
     </div>
   );
 };

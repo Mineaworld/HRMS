@@ -135,11 +135,16 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
 
   // Convert all options to string value internally
   const normalizedOptions = React.useMemo(() => {
+    if (!Array.isArray(options)) return [];
     return options.map((opt) => ({
       value: String(opt.value),
       label: opt.label,
     }));
   }, [options]);
+
+  const selectedOption = React.useMemo(() => {
+    return normalizedOptions.find((o) => o.value === selected);
+  }, [normalizedOptions, selected]);
 
   // Determine recent items if storageKey is active
   const recentItems = React.useMemo(() => {
@@ -180,7 +185,9 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
           )}
           style={fixedWidthStyle ? { width: fixedWidthStyle, minWidth: fixedWidthStyle } : undefined}
         >
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={placeholder}>
+            {selectedOption ? selectedOption.label : undefined}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent
           className="bg-white/95 backdrop-blur-md border-slate-200 shadow-xl rounded-xl"

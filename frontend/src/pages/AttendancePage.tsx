@@ -18,6 +18,7 @@ import {
 import { useHrmsStore } from '../store/useHrmsStore';
 import { hasPermission } from '../utils/rbac';
 import { AttendanceRecord } from '../types';
+import { Modal, Drawer } from '../components/ui/modal';
 
 export const AttendancePage: React.FC = () => {
   const {
@@ -394,214 +395,185 @@ export const AttendancePage: React.FC = () => {
       </div>
 
       {/* MODAL: Request Punch Correction */}
-      {isCorrectionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Request Punch Correction</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Submits to operation_service (/api/attendance/corrections)
-                </p>
-              </div>
-              <button
-                onClick={() => setIsCorrectionModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
-              >
-                <X weight="bold" className="w-4 h-4" />
-              </button>
+      <Modal
+        isOpen={isCorrectionModalOpen}
+        onClose={() => setIsCorrectionModalOpen(false)}
+        title="Request Punch Correction"
+        subtitle="Submits to operation_service (/api/attendance/corrections)"
+        maxWidth="md"
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!targetRecordForCorrection) return;
+
+            requestAttendanceCorrection({
+              attendanceId: targetRecordForCorrection.attendanceId,
+              employeeId: targetRecordForCorrection.employeeId,
+              employeeName: targetRecordForCorrection.employeeName,
+              attendanceDate: targetRecordForCorrection.attendanceDate,
+              originalCheckIn: targetRecordForCorrection.checkIn,
+              originalCheckOut: targetRecordForCorrection.checkOut,
+              requestedCheckIn: reqCheckIn,
+              requestedCheckOut: reqCheckOut,
+              reason: reqReason,
+            });
+
+            setIsCorrectionModalOpen(false);
+            setToastMessage('Correction request submitted for manager review.');
+            setTimeout(() => setToastMessage(null), 4000);
+          }}
+          className="space-y-3.5"
+        >
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+            <div className="font-semibold text-slate-800">
+              {targetRecordForCorrection?.employeeName} • {targetRecordForCorrection?.attendanceDate}
             </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!targetRecordForCorrection) return;
-
-                requestAttendanceCorrection({
-                  attendanceId: targetRecordForCorrection.attendanceId,
-                  employeeId: targetRecordForCorrection.employeeId,
-                  employeeName: targetRecordForCorrection.employeeName,
-                  attendanceDate: targetRecordForCorrection.attendanceDate,
-                  originalCheckIn: targetRecordForCorrection.checkIn,
-                  originalCheckOut: targetRecordForCorrection.checkOut,
-                  requestedCheckIn: reqCheckIn,
-                  requestedCheckOut: reqCheckOut,
-                  reason: reqReason,
-                });
-
-                setIsCorrectionModalOpen(false);
-                setToastMessage('Correction request submitted for manager review.');
-                setTimeout(() => setToastMessage(null), 4000);
-              }}
-              className="space-y-3.5"
-            >
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                <div className="font-semibold text-slate-800">
-                  {targetRecordForCorrection?.employeeName} • {targetRecordForCorrection?.attendanceDate}
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5 font-mono">
-                  Current: In {targetRecordForCorrection?.checkIn || 'None'} / Out{' '}
-                  {targetRecordForCorrection?.checkOut || 'None'}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Corrected Check-In
-                  </label>
-                  <input
-                    type="text"
-                    value={reqCheckIn}
-                    onChange={(e) => setReqCheckIn(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Corrected Check-Out
-                  </label>
-                  <input
-                    type="text"
-                    value={reqCheckOut}
-                    onChange={(e) => setReqCheckOut(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Reason for Adjustment
-                </label>
-                <textarea
-                  value={reqReason}
-                  onChange={(e) => setReqReason(e.target.value)}
-                  rows={2}
-                  required
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCorrectionModalOpen(false)}
-                  className="px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold active:scale-[0.98] transition-all"
-                >
-                  Submit Request
-                </button>
-              </div>
-            </form>
+            <div className="text-[11px] text-slate-500 mt-0.5 font-mono">
+              Current: In {targetRecordForCorrection?.checkIn || 'None'} / Out{' '}
+              {targetRecordForCorrection?.checkOut || 'None'}
+            </div>
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Corrected Check-In
+              </label>
+              <input
+                type="text"
+                value={reqCheckIn}
+                onChange={(e) => setReqCheckIn(e.target.value)}
+                required
+                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Corrected Check-Out
+              </label>
+              <input
+                type="text"
+                value={reqCheckOut}
+                onChange={(e) => setReqCheckOut(e.target.value)}
+                required
+                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Reason for Adjustment
+            </label>
+            <textarea
+              value={reqReason}
+              onChange={(e) => setReqReason(e.target.value)}
+              rows={2}
+              required
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCorrectionModalOpen(false)}
+              className="px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold active:scale-[0.98] transition-all"
+            >
+              Submit Request
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* DRAWER: Manager Corrections Review Queue */}
-      {isQueueDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/30 backdrop-blur-xs animate-fadeIn">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto animate-slideLeft">
-            <div>
-              <div className="flex items-start justify-between pb-4 border-b border-slate-100">
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                    Operation Service Audit
-                  </span>
-                  <h2 className="text-lg font-bold text-slate-900 mt-0.5">Corrections Queue</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Review and approve employee attendance adjustment disputes
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsQueueDrawerOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+      <Drawer
+        isOpen={isQueueDrawerOpen}
+        onClose={() => setIsQueueDrawerOpen(false)}
+        title="Corrections Queue"
+        subtitle="Review and approve employee attendance adjustment disputes"
+        width="md"
+      >
+        <div className="space-y-4">
+          <div className="space-y-3 max-h-[65vh] overflow-y-auto">
+            {attendanceCorrections.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                No correction requests submitted.
+              </div>
+            ) : (
+              attendanceCorrections.map((corr) => (
+                <div
+                  key={corr.correctionId}
+                  className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-2.5"
                 >
-                  <X weight="bold" className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {attendanceCorrections.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400">
-                    No correction requests submitted.
-                  </div>
-                ) : (
-                  attendanceCorrections.map((corr) => (
-                    <div
-                      key={corr.correctionId}
-                      className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-2.5"
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-xs text-slate-900">
+                      {corr.employeeName}
+                    </span>
+                    <span
+                      className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        corr.status === 'APPROVED'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : corr.status === 'REJECTED'
+                          ? 'bg-rose-50 text-rose-700'
+                          : 'bg-amber-50 text-amber-700'
+                      }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-xs text-slate-900">
-                          {corr.employeeName}
-                        </span>
-                        <span
-                          className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            corr.status === 'APPROVED'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : corr.status === 'REJECTED'
-                              ? 'bg-rose-50 text-rose-700'
-                              : 'bg-amber-50 text-amber-700'
-                          }`}
-                        >
-                          {corr.status}
-                        </span>
-                      </div>
+                      {corr.status}
+                    </span>
+                  </div>
 
-                      <div className="text-[11px] text-slate-500 font-mono">
-                        Date: {corr.attendanceDate} • Requested: In {corr.requestedCheckIn} / Out{' '}
-                        {corr.requestedCheckOut}
-                      </div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    Date: {corr.attendanceDate} • Requested: In {corr.requestedCheckIn} / Out{' '}
+                    {corr.requestedCheckOut}
+                  </div>
 
-                      <p className="text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100 italic">
-                        "{corr.reason}"
-                      </p>
+                  <p className="text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100 italic">
+                    "{corr.reason}"
+                  </p>
 
-                      {corr.status === 'PENDING' && isManager && (
-                        <div className="pt-2 flex items-center justify-end gap-2">
-                          <button
-                            onClick={() =>
-                              reviewAttendanceCorrection(corr.correctionId, 'REJECTED')
-                            }
-                            className="px-3 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200"
-                          >
-                            Reject
-                          </button>
-                          <button
-                            onClick={() =>
-                              reviewAttendanceCorrection(corr.correctionId, 'APPROVED')
-                            }
-                            className="px-3 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs active:scale-[0.98]"
-                          >
-                            Approve & Overwrite
-                          </button>
-                        </div>
-                      )}
+                  {corr.status === 'PENDING' && isManager && (
+                    <div className="pt-2 flex items-center justify-end gap-2">
+                      <button
+                        onClick={() =>
+                          reviewAttendanceCorrection(corr.correctionId, 'REJECTED')
+                        }
+                        className="px-3 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() =>
+                          reviewAttendanceCorrection(corr.correctionId, 'APPROVED')
+                        }
+                        className="px-3 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs active:scale-[0.98]"
+                      >
+                        Approve & Overwrite
+                      </button>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
 
-            <div className="pt-4 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => setIsQueueDrawerOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700"
-              >
-                Close Queue
-              </button>
-            </div>
+          <div className="pt-4 border-t border-slate-100 flex justify-end">
+            <button
+              onClick={() => setIsQueueDrawerOpen(false)}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700"
+            >
+              Close Queue
+            </button>
           </div>
         </div>
-      )}
+      </Drawer>
     </div>
   );
 };

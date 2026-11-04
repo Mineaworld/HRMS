@@ -17,6 +17,7 @@ import {
 import { useHrmsStore } from '../store/useHrmsStore';
 import { Department, Employee } from '../types';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { Modal, Drawer } from '../components/ui/modal';
 
 export const DepartmentsPage: React.FC = () => {
   const { departments, employees, addDepartment, updateDepartment, deleteDepartment, currentUser } =
@@ -310,179 +311,150 @@ export const DepartmentsPage: React.FC = () => {
       </div>
 
       {/* 6. MEMBER ROSTER SIDE DRAWER */}
-      {selectedDeptForRoster && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/30 backdrop-blur-xs animate-fadeIn">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto animate-slideLeft">
-            <div>
-              <div className="flex items-start justify-between pb-4 border-b border-slate-100">
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                    Department Roster
-                  </span>
-                  <h2 className="text-lg font-bold text-slate-900 mt-0.5">
-                    {selectedDeptForRoster.departmentName}
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {rosterEmployees.length} active employees assigned
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedDeptForRoster(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+      <Drawer
+        isOpen={!!selectedDeptForRoster}
+        onClose={() => setSelectedDeptForRoster(null)}
+        title={selectedDeptForRoster?.departmentName || 'Department Roster'}
+        subtitle={`${rosterEmployees.length} active employees assigned`}
+        width="md"
+      >
+        <div className="space-y-4">
+          <div className="space-y-2.5 max-h-[65vh] overflow-y-auto">
+            {rosterEmployees.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                No employees currently assigned to this division.
+              </div>
+            ) : (
+              rosterEmployees.map((emp) => (
+                <div
+                  key={emp.employeeId}
+                  className="p-3 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
                 >
-                  <X weight="bold" className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Roster list */}
-              <div className="mt-4 space-y-2.5">
-                {rosterEmployees.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400">
-                    No employees currently assigned to this division.
-                  </div>
-                ) : (
-                  rosterEmployees.map((emp) => (
-                    <div
-                      key={emp.employeeId}
-                      className="p-3 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={emp.avatarUrl}
-                          alt={emp.firstName}
-                          className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200"
-                        />
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-semibold text-slate-900 truncate">
-                            {emp.firstName} {emp.lastName}
-                          </h4>
-                          <p className="text-[10px] text-slate-400 truncate">{emp.jobTitle}</p>
-                          <span className="text-[10px] font-mono text-slate-400">{emp.email}</span>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`font-mono text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          emp.status === 'Active'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-amber-50 text-amber-700'
-                        }`}
-                      >
-                        {emp.status}
-                      </span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={emp.avatarUrl}
+                      alt={emp.firstName}
+                      className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200"
+                    />
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-semibold text-slate-900 truncate">
+                        {emp.firstName} {emp.lastName}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 truncate">{emp.jobTitle}</p>
+                      <span className="text-[10px] font-mono text-slate-400">{emp.email}</span>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
+                  </div>
 
-            <div className="pt-4 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => setSelectedDeptForRoster(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700"
-              >
-                Close Roster
-              </button>
-            </div>
+                  <span
+                    className={`font-mono text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      emp.status === 'Active'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {emp.status}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 flex justify-end">
+            <button
+              onClick={() => setSelectedDeptForRoster(null)}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700"
+            >
+              Close Roster
+            </button>
           </div>
         </div>
-      )}
+      </Drawer>
 
       {/* 7. CREATE / EDIT DEPARTMENT MODAL */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900">
-                {editingDept ? 'Edit Department' : 'Create New Department'}
-              </h3>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
-              >
-                <X weight="bold" className="w-4 h-4" />
-              </button>
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title={editingDept ? 'Edit Department' : 'Create New Department'}
+        subtitle="Manage organizational structure and departmental leadership"
+        maxWidth="md"
+      >
+        <form onSubmit={handleSaveDepartment} className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Department Name
+            </label>
+            <input
+              type="text"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder="e.g. AI Cloud Infrastructure"
+              required
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={formDesc}
+              onChange={(e) => setFormDesc(e.target.value)}
+              placeholder="Operational scope and mission of this unit..."
+              rows={2}
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Monthly Budget (USD)
+              </label>
+              <input
+                type="number"
+                value={formBudget}
+                onChange={(e) => setFormBudget(e.target.value)}
+                placeholder="40000"
+                required
+                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+              />
             </div>
 
-            <form onSubmit={handleSaveDepartment} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Department Name
-                </label>
-                <input
-                  type="text"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. AI Cloud Infrastructure"
-                  required
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formDesc}
-                  onChange={(e) => setFormDesc(e.target.value)}
-                  placeholder="Operational scope and mission of this unit..."
-                  rows={2}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Monthly Budget (USD)
-                  </label>
-                  <input
-                    type="number"
-                    value={formBudget}
-                    onChange={(e) => setFormBudget(e.target.value)}
-                    placeholder="40000"
-                    required
-                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Department Lead
-                  </label>
-                  <BehavioralHistorySelect
-                    placeholder="Choose lead..."
-                    options={employees.map((emp) => ({
-                      value: emp.employeeId,
-                      label: `${emp.firstName} ${emp.lastName}`,
-                    }))}
-                    value={formLeadId}
-                    onChange={(val) => setFormLeadId(Number(val))}
-                    storageKey="hrms_dept_lead_history"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold active:scale-[0.98] transition-all"
-                >
-                  {editingDept ? 'Save Changes' : 'Create Department'}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Department Lead
+              </label>
+              <BehavioralHistorySelect
+                placeholder="Choose lead..."
+                options={employees.map((emp) => ({
+                  value: emp.employeeId,
+                  label: `${emp.firstName} ${emp.lastName}`,
+                }))}
+                value={formLeadId}
+                onChange={(val) => setFormLeadId(Number(val))}
+                storageKey="hrms_dept_lead_history"
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(false)}
+              className="px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold active:scale-[0.98] transition-all"
+            >
+              {editingDept ? 'Save Changes' : 'Create Department'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

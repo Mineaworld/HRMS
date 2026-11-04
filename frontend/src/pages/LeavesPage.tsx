@@ -16,6 +16,7 @@ import {
 import { useHrmsStore } from '../store/useHrmsStore';
 import { LeaveRequest } from '../types';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { Modal } from '../components/ui/modal';
 import { hasPermission } from '../utils/rbac';
 
 export const LeavesPage: React.FC = () => {
@@ -273,120 +274,111 @@ export const LeavesPage: React.FC = () => {
       </div>
 
       {/* Apply Leave Modal */}
-      {isApplyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl w-full max-w-md p-6 shadow-2xl border border-white max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Submit Leave Application</h3>
-              <button
-                onClick={() => setIsApplyModalOpen(false)}
-                aria-label="Close dialog"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-              >
-                <X weight="bold" className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleApply} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Leave Type
-                </label>
-                <BehavioralHistorySelect
-                  label="Select Leave Type"
-                  options={[
-                    { value: 'Casual Leave', label: 'Casual Leave' },
-                    { value: 'Sick Leave', label: 'Sick Leave' },
-                    { value: 'Birthday / Anniv', label: 'Birthday / Anniversary Leave' },
-                    { value: 'Optional Holiday', label: 'Optional Holiday' },
-                    { value: 'Privilege Leave', label: 'Privilege Leave' },
-                  ]}
-                  value={formData.leaveType}
-                  onChange={(val) => setFormData({ ...formData, leaveType: val as any })}
-                  storageKey="hrms_leave_type_history"
-                  placeholder="Choose leave type..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="startDateInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    id="startDateInput"
-                    type="date"
-                    required
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="endDateInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    id="endDateInput"
-                    type="date"
-                    required
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="daysCountInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Days Count
-                </label>
-                <input
-                  id="daysCountInput"
-                  type="number"
-                  min="1"
-                  max="30"
-                  required
-                  value={formData.daysCount}
-                  onChange={(e) => setFormData({ ...formData, daysCount: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="reasonInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Reason for Absence
-                </label>
-                <textarea
-                  id="reasonInput"
-                  rows={3}
-                  required
-                  placeholder="Explain why you are taking leave..."
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsApplyModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-semibold shadow-sm transition-all"
-                >
-                  Submit Application
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isApplyModalOpen}
+        onClose={() => setIsApplyModalOpen(false)}
+        title="Submit Leave Application"
+        subtitle="Request time off for approval by HR and management"
+        maxWidth="md"
+      >
+        <form onSubmit={handleApply} className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              Leave Type
+            </label>
+            <BehavioralHistorySelect
+              label="Select Leave Type"
+              options={[
+                { value: 'Casual Leave', label: 'Casual Leave' },
+                { value: 'Sick Leave', label: 'Sick Leave' },
+                { value: 'Birthday / Anniv', label: 'Birthday / Anniversary Leave' },
+                { value: 'Optional Holiday', label: 'Optional Holiday' },
+                { value: 'Privilege Leave', label: 'Privilege Leave' },
+              ]}
+              value={formData.leaveType}
+              onChange={(val) => setFormData({ ...formData, leaveType: val as any })}
+              storageKey="hrms_leave_type_history"
+              placeholder="Choose leave type..."
+            />
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="startDateInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                Start Date
+              </label>
+              <input
+                id="startDateInput"
+                type="date"
+                required
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              />
+            </div>
+            <div>
+              <label htmlFor="endDateInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
+                End Date
+              </label>
+              <input
+                id="endDateInput"
+                type="date"
+                required
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="daysCountInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
+              Days Count
+            </label>
+            <input
+              id="daysCountInput"
+              type="number"
+              min="1"
+              max="30"
+              required
+              value={formData.daysCount}
+              onChange={(e) => setFormData({ ...formData, daysCount: Number(e.target.value) })}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="reasonInput" className="block text-[11px] font-semibold text-slate-600 mb-1">
+              Reason for Absence
+            </label>
+            <textarea
+              id="reasonInput"
+              rows={3}
+              required
+              placeholder="Explain why you are taking leave..."
+              value={formData.reason}
+              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsApplyModalOpen(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-semibold shadow-sm transition-all"
+            >
+              Submit Application
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
