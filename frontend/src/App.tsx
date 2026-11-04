@@ -8,6 +8,8 @@ import { AttendancePage } from './pages/AttendancePage';
 import { LeavesPage } from './pages/LeavesPage';
 import { PayrollPage } from './pages/PayrollPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { DepartmentsPage } from './pages/DepartmentsPage';
+import { AutomationsPage } from './pages/AutomationsPage';
 import { LoginPage } from './pages/LoginPage';
 import { useHrmsStore } from './store/useHrmsStore';
 import {
@@ -39,6 +41,10 @@ export const App: React.FC = () => {
         return <DashboardPage />;
       case 'employees':
         return <EmployeesPage />;
+      case 'departments':
+        return <DepartmentsPage />;
+      case 'automations':
+        return <AutomationsPage />;
       case 'attendance':
       case 'timesheet':
         return <AttendancePage />;

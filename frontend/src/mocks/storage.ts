@@ -7,6 +7,8 @@ import {
   INITIAL_PAYROLL,
   INITIAL_PENDING_ACTIONS,
   INITIAL_ANNOUNCEMENTS,
+  INITIAL_CRON_HISTORY,
+  INITIAL_ATTENDANCE_CORRECTIONS,
 } from './initialData';
 import {
   Employee,
@@ -17,6 +19,8 @@ import {
   PendingAction,
   Announcement,
   UserAccount,
+  JobExecution,
+  AttendanceCorrection,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -28,6 +32,8 @@ const STORAGE_KEYS = {
   PAYROLL: 'hrms_payroll',
   PENDING_ACTIONS: 'hrms_pending_actions',
   ANNOUNCEMENTS: 'hrms_announcements',
+  CRON_HISTORY: 'hrms_cron_history',
+  ATTENDANCE_CORRECTIONS: 'hrms_attendance_corrections',
 };
 
 export const loadFromStorage = <T>(key: string, fallback: T): T => {
@@ -58,6 +64,8 @@ export const getStoredData = () => {
     payroll: loadFromStorage<PayrollRecord[]>(STORAGE_KEYS.PAYROLL, INITIAL_PAYROLL),
     pendingActions: loadFromStorage<PendingAction[]>(STORAGE_KEYS.PENDING_ACTIONS, INITIAL_PENDING_ACTIONS),
     announcements: loadFromStorage<Announcement[]>(STORAGE_KEYS.ANNOUNCEMENTS, INITIAL_ANNOUNCEMENTS),
+    cronHistory: loadFromStorage<JobExecution[]>(STORAGE_KEYS.CRON_HISTORY, INITIAL_CRON_HISTORY),
+    attendanceCorrections: loadFromStorage<AttendanceCorrection[]>(STORAGE_KEYS.ATTENDANCE_CORRECTIONS, INITIAL_ATTENDANCE_CORRECTIONS),
   };
 };
 
@@ -70,4 +78,6 @@ export const resetAllStorage = () => {
   localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(INITIAL_PAYROLL));
   localStorage.setItem(STORAGE_KEYS.PENDING_ACTIONS, JSON.stringify(INITIAL_PENDING_ACTIONS));
   localStorage.setItem(STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify(INITIAL_ANNOUNCEMENTS));
+  localStorage.setItem(STORAGE_KEYS.CRON_HISTORY, JSON.stringify(INITIAL_CRON_HISTORY));
+  localStorage.setItem(STORAGE_KEYS.ATTENDANCE_CORRECTIONS, JSON.stringify(INITIAL_ATTENDANCE_CORRECTIONS));
 };

@@ -11,11 +11,56 @@ export const INITIAL_USER: UserAccount = {
 };
 
 export const INITIAL_DEPARTMENTS: Department[] = [
-  { departmentId: 1, departmentName: 'Software Engineering', description: 'Core microservices and cloud infrastructure development', headCount: 14 },
-  { departmentId: 2, departmentName: 'Human Resources', description: 'People operations, payroll processing, and employee relations', headCount: 4 },
-  { departmentId: 3, departmentName: 'Product & UI Design', description: 'User experience research and visual design systems', headCount: 6 },
-  { departmentId: 4, departmentName: 'Finance & Accounting', description: 'Financial forecasting, tax compliance, and payroll auditing', headCount: 5 },
-  { departmentId: 5, departmentName: 'Customer Success', description: 'Enterprise client relationship management and technical support', headCount: 8 },
+  {
+    departmentId: 1,
+    departmentName: 'Software Engineering',
+    description: 'Core microservices, cloud telemetry, and distributed infrastructure',
+    headCount: 14,
+    leadEmployeeId: 1,
+    leadName: 'Prasenjit Mondal',
+    leadAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    budget: 85000,
+  },
+  {
+    departmentId: 2,
+    departmentName: 'Human Resources',
+    description: 'People operations, compensation audits, and employee engagement',
+    headCount: 4,
+    leadEmployeeId: 3,
+    leadName: 'Sarah Jenkins',
+    leadAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
+    budget: 28000,
+  },
+  {
+    departmentId: 3,
+    departmentName: 'Product & UI Design',
+    description: 'User experience research, design systems, and rapid prototyping',
+    headCount: 6,
+    leadEmployeeId: 6,
+    leadName: 'Sophea Chan',
+    leadAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+    budget: 38000,
+  },
+  {
+    departmentId: 4,
+    departmentName: 'Finance & Accounting',
+    description: 'Financial forecasting, tax compliance, and payroll auditing',
+    headCount: 5,
+    leadEmployeeId: 5,
+    leadName: 'David Kim',
+    leadAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+    budget: 45000,
+  },
+  {
+    departmentId: 5,
+    departmentName: 'Customer Success',
+    description: 'Enterprise client relationship management and technical operations support',
+    headCount: 8,
+    leadEmployeeId: 4,
+    leadName: 'Alex Mercer',
+    leadAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    budget: 32000,
+  },
 ];
 
 export const INITIAL_EMPLOYEES: Employee[] = [
@@ -218,4 +263,60 @@ export const INITIAL_ANNOUNCEMENTS: Announcement[] = [
   { id: 4, description: 'Internal Strategic Engineering Meeting', date: '19.03.2026', tag: 'Engineering' },
   { id: 5, description: 'AI & Copilot Systems Training Session', date: '20.03.2026', tag: 'Training' },
   { id: 6, description: 'Power BI & HR Analytics Workshop', date: '27.03.2026', tag: 'Workshop' },
+];
+
+export const INITIAL_CRON_HISTORY: import('../types').JobExecution[] = [
+  {
+    id: 'exec-101',
+    jobName: 'DailyAttendanceSyncJob',
+    executionTime: '2026-03-14 01:00:02',
+    status: 'SUCCESS',
+    durationMs: 48,
+    message: 'Reconciled 14 active logs, marked 0 unexpected absences.',
+    triggeredBy: 'CRON_DAEMON (0 0 1 * * ?)',
+  },
+  {
+    id: 'exec-102',
+    jobName: 'ContractExpiryJob',
+    executionTime: '2026-03-14 08:00:01',
+    status: 'SUCCESS',
+    durationMs: 32,
+    message: 'Evaluated 14 employee contracts; 0 pending expirations within 30 days.',
+    triggeredBy: 'CRON_DAEMON (0 0 8 * * ?)',
+  },
+  {
+    id: 'exec-103',
+    jobName: 'MonthlyPayrollJob',
+    executionTime: '2026-02-28 00:00:05',
+    status: 'SUCCESS',
+    durationMs: 142,
+    message: 'Generated 14 payroll records for period February 2026.',
+    triggeredBy: 'CRON_DAEMON (0 0 0 28 * ?)',
+  },
+  {
+    id: 'exec-104',
+    jobName: 'WeeklyReportJob',
+    executionTime: '2026-03-09 09:00:01',
+    status: 'SUCCESS',
+    durationMs: 87,
+    message: 'Compiled weekly attendance and department cost aggregates for report_service (:8083).',
+    triggeredBy: 'CRON_DAEMON (0 0 9 ? * MON)',
+  },
+];
+
+export const INITIAL_ATTENDANCE_CORRECTIONS: import('../types').AttendanceCorrection[] = [
+  {
+    correctionId: 1,
+    attendanceId: 2,
+    employeeId: 6,
+    employeeName: 'Sophea Chan',
+    attendanceDate: '2026-03-13',
+    originalCheckIn: '08:42 AM',
+    originalCheckOut: '05:00 PM',
+    requestedCheckIn: '08:00 AM',
+    requestedCheckOut: '05:00 PM',
+    reason: 'Biometric fingerprint reader timeout at main reception entrance',
+    status: 'PENDING',
+    requestedAt: '2026-03-13 09:15:00',
+  },
 ];

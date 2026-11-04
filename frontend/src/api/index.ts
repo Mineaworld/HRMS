@@ -133,3 +133,48 @@ export const reportApi = {
     return res.data;
   },
 };
+
+export const departmentApi = {
+  getAll: async () => {
+    const res = await apiClient.get('/api/departments');
+    return res.data;
+  },
+  getById: async (id: number) => {
+    const res = await apiClient.get(`/api/departments/${id}`);
+    return res.data;
+  },
+  create: async (data: any) => {
+    const res = await apiClient.post('/api/departments', data);
+    return res.data;
+  },
+  update: async (id: number, data: any) => {
+    const res = await apiClient.patch(`/api/departments/${id}`, data);
+    return res.data;
+  },
+  delete: async (id: number) => {
+    const res = await apiClient.delete(`/api/departments/${id}`);
+    return res.data;
+  },
+};
+
+export const cronApi = {
+  getHistory: async () => {
+    const res = await apiClient.get('/api/v1/jobs/history');
+    return res.data;
+  },
+  triggerJob: async (jobName: string) => {
+    const res = await apiClient.post(`/api/v1/jobs/${jobName}/trigger`);
+    return res.data;
+  },
+};
+
+export const attendanceCorrectionApi = {
+  correct: async (attendanceId: number, data: any) => {
+    const res = await apiClient.post(`/api/attendance/${attendanceId}/corrections`, data);
+    return res.data;
+  },
+  getHistory: async (attendanceId: number) => {
+    const res = await apiClient.get(`/api/attendance/${attendanceId}/corrections`);
+    return res.data;
+  },
+};

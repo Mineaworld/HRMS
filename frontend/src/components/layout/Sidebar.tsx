@@ -10,6 +10,7 @@ import {
   CaretLeft,
   SignOut,
   Buildings,
+  Cpu,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
 import { getRoleBadge, isRoleAllowedForTab } from '../../utils/rbac';
@@ -35,6 +36,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
       id: 'employees' as NavTab,
       label: isEmployee ? 'Staff Directory' : 'Employees',
       icon: UsersThree,
+    },
+    {
+      id: 'departments' as NavTab,
+      label: 'Organization',
+      icon: Buildings,
+    },
+    {
+      id: 'automations' as NavTab,
+      label: 'Automations',
+      icon: Cpu,
     },
     {
       id: 'leaves' as NavTab,

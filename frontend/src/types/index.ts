@@ -32,6 +32,45 @@ export interface Department {
   departmentName: string;
   description: string;
   headCount: number;
+  leadEmployeeId?: number;
+  leadName?: string;
+  leadAvatar?: string;
+  budget?: number;
+}
+
+export interface JobExecution {
+  id: string;
+  jobName: 'DailyAttendanceSyncJob' | 'ContractExpiryJob' | 'MonthlyPayrollJob' | 'WeeklyReportJob' | string;
+  executionTime: string;
+  status: 'SUCCESS' | 'FAILED' | 'RUNNING';
+  durationMs: number;
+  message: string;
+  triggeredBy: string;
+}
+
+export interface AttendanceCorrection {
+  correctionId: number;
+  attendanceId: number;
+  employeeId: number;
+  employeeName: string;
+  attendanceDate: string;
+  originalCheckIn: string | null;
+  originalCheckOut: string | null;
+  requestedCheckIn: string;
+  requestedCheckOut: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+}
+
+export interface PayrollProfile {
+  profileId?: number;
+  employeeId: number;
+  baseSalary: number;
+  dailyRate: number;
+  latePenaltyPerMinute: number;
 }
 
 export interface AttendanceRecord {

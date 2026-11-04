@@ -9,11 +9,23 @@ import {
   Announcement,
   UserAccount,
   UserRole,
+  JobExecution,
+  AttendanceCorrection,
 } from '../types';
 import { getStoredData, saveToStorage, resetAllStorage } from '../mocks/storage';
 import { ROLE_PERSONAS, isRoleAllowedForTab } from '../utils/rbac';
 
-export type NavTab = 'dashboard' | 'attendance' | 'timesheet' | 'employees' | 'leaves' | 'payroll' | 'reports' | 'profile';
+export type NavTab =
+  | 'dashboard'
+  | 'attendance'
+  | 'timesheet'
+  | 'employees'
+  | 'departments'
+  | 'automations'
+  | 'leaves'
+  | 'payroll'
+  | 'reports'
+  | 'profile';
 
 interface HrmsState {
   // Session & Authentication
@@ -39,6 +51,20 @@ interface HrmsState {
   payroll: PayrollRecord[];
   pendingActions: PendingAction[];
   announcements: Announcement[];
+  cronHistory: JobExecution[];
+  attendanceCorrections: AttendanceCorrection[];
+
+  // Department Operations
+  addDepartment: (dept: Omit<Department, 'departmentId' | 'headCount'>) => void;
+  updateDepartment: (id: number, dept: Partial<Department>) => void;
+  deleteDepartment: (id: number) => { success: boolean; error?: string };
+
+  // Cron Operations
+  triggerCronJob: (jobName: string) => void;
+
+  // Attendance Correction Operations
+  requestAttendanceCorrection: (req: Omit<AttendanceCorrection, 'correctionId' | 'status' | 'requestedAt'>) => void;
+  reviewAttendanceCorrection: (correctionId: number, status: 'APPROVED' | 'REJECTED') => void;
 
   // Employee Operations
   addEmployee: (emp: Omit<Employee, 'employeeId'>) => void;
@@ -124,6 +150,153 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     payroll: initial.payroll,
     pendingActions: initial.pendingActions,
     announcements: initial.announcements,
+    cronHistory: initial.cronHistory,
+    attendanceCorrections: initial.attendanceCorrections,
+
+    addDepartment: (deptData) => {
+      set((state) => {
+        const newId = Math.max(0, ...state.departments.map((d) => d.departmentId)) + 1;
+        const lead = state.employees.find((e) => e.employeeId === deptData.leadEmployeeId);
+        const newDept: Department = {
+          ...deptData,
+          departmentId: newId,
+          headCount: 0,
+          leadName: lead ? `${lead.firstName} ${lead.lastName}` : deptData.leadName,
+          leadAvatar: lead ? lead.avatarUrl : deptData.leadAvatar,
+        };
+        const updated = [...state.departments, newDept];
+        saveToStorage('hrms_departments', updated);
+        return { departments: updated };
+      });
+    },
+
+    updateDepartment: (id, updates) => {
+      set((state) => {
+        const updated = state.departments.map((d) => {
+          if (d.departmentId === id) {
+            const next = { ...d, ...updates };
+            if (updates.leadEmployeeId) {
+              const lead = state.employees.find((e) => e.employeeId === updates.leadEmployeeId);
+              if (lead) {
+                next.leadName = `${lead.firstName} ${lead.lastName}`;
+                next.leadAvatar = lead.avatarUrl;
+              }
+            }
+            return next;
+          }
+          return d;
+        });
+        saveToStorage('hrms_departments', updated);
+        return { departments: updated };
+      });
+    },
+
+    deleteDepartment: (id) => {
+      const state = get();
+      const hasEmployees = state.employees.some((e) => e.departmentId === id);
+      if (hasEmployees) {
+        return {
+          success: false,
+          error: 'Cannot delete department with active assigned employees (DepartmentHasEmployeesException). Reassign staff first.',
+        };
+      }
+      const updated = state.departments.filter((d) => d.departmentId !== id);
+      saveToStorage('hrms_departments', updated);
+      set({ departments: updated });
+      return { success: true };
+    },
+
+    triggerCronJob: (jobName) => {
+      const now = new Date();
+      const timeStr = now.toISOString().replace('T', ' ').substring(0, 19);
+      let duration = Math.floor(Math.random() * 80) + 35;
+      let msg = `Job ${jobName} triggered manually and finished successfully.`;
+
+      // Cross-service reactive triggers
+      if (jobName === 'MonthlyPayrollJob') {
+        const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+        get().generateMonthlyPayroll(currentMonth);
+        msg = `Triggered monthly payroll batch for ${currentMonth}; processed records across all active personnel.`;
+      } else if (jobName === 'DailyAttendanceSyncJob') {
+        msg = `Synchronized daily attendance logs: 0 anomalous punches flagged.`;
+      } else if (jobName === 'ContractExpiryJob') {
+        msg = `Scanned contracts: 0 expiring within 30 days.`;
+      } else if (jobName === 'WeeklyReportJob') {
+        msg = `Compiled weekly cross-department summaries for report_service.`;
+      }
+
+      const newExecution: JobExecution = {
+        id: `exec-${Date.now()}`,
+        jobName,
+        executionTime: timeStr,
+        status: 'SUCCESS',
+        durationMs: duration,
+        message: msg,
+        triggeredBy: `MANUAL (${get().currentUser.userName})`,
+      };
+
+      set((state) => {
+        const updated = [newExecution, ...state.cronHistory];
+        saveToStorage('hrms_cron_history', updated);
+        return { cronHistory: updated };
+      });
+    },
+
+    requestAttendanceCorrection: (reqData) => {
+      set((state) => {
+        const newId = Math.max(0, ...state.attendanceCorrections.map((c) => c.correctionId)) + 1;
+        const newCorrection: AttendanceCorrection = {
+          ...reqData,
+          correctionId: newId,
+          status: 'PENDING',
+          requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        };
+        const updated = [newCorrection, ...state.attendanceCorrections];
+        saveToStorage('hrms_attendance_corrections', updated);
+        return { attendanceCorrections: updated };
+      });
+    },
+
+    reviewAttendanceCorrection: (correctionId, status) => {
+      set((state) => {
+        const target = state.attendanceCorrections.find((c) => c.correctionId === correctionId);
+        if (!target) return state;
+
+        const updatedCorrections = state.attendanceCorrections.map((c) =>
+          c.correctionId === correctionId
+            ? {
+                ...c,
+                status,
+                reviewedBy: state.currentUser.fullName,
+                reviewedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+              }
+            : c
+        );
+        saveToStorage('hrms_attendance_corrections', updatedCorrections);
+
+        // If approved, overwrite the attendance record punch times!
+        let updatedAttendance = state.attendance;
+        if (status === 'APPROVED') {
+          updatedAttendance = state.attendance.map((a) =>
+            a.attendanceId === target.attendanceId
+              ? {
+                  ...a,
+                  checkIn: target.requestedCheckIn,
+                  checkOut: target.requestedCheckOut,
+                  status: 'PRESENT' as const,
+                  lateMinutes: 0,
+                }
+              : a
+          );
+          saveToStorage('hrms_attendance', updatedAttendance);
+        }
+
+        return {
+          attendanceCorrections: updatedCorrections,
+          attendance: updatedAttendance,
+        };
+      });
+    },
 
     addEmployee: (empData) => {
       set((state) => {

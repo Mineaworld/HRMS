@@ -18,9 +18,16 @@ import { BehavioralHistorySelect } from '../components/ui/behavioral-history-sel
 import { hasPermission } from '../utils/rbac';
 
 export const PayrollPage: React.FC = () => {
-  const { payroll, employees, generateMonthlyPayroll, markPayrollPaid, currentUser } = useHrmsStore();
+  const { payroll, employees, generateMonthlyPayroll, markPayrollPaid, currentUser, updateEmployee } = useHrmsStore();
   const [selectedMonth, setSelectedMonth] = useState('January 2026');
   const [viewingPayslip, setViewingPayslip] = useState<PayrollRecord | null>(null);
+
+  // Salary Setup Modal State (PayrollProfile)
+  const [isSalarySetupOpen, setIsSalarySetupOpen] = useState(false);
+  const [profileEmpId, setProfileEmpId] = useState<number>(1);
+  const [profileBaseSalary, setProfileBaseSalary] = useState<number>(2800);
+  const [profilePenaltyPerMin, setProfilePenaltyPerMin] = useState<number>(0.26);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const canViewAll = hasPermission(currentUser.role, 'PAYROLL_VIEW_ALL');
   const canGenerate = hasPermission(currentUser.role, 'PAYROLL_GENERATE_BATCH');
@@ -43,7 +50,26 @@ export const PayrollPage: React.FC = () => {
 
   const handleGenerate = () => {
     generateMonthlyPayroll(selectedMonth);
-    alert(`Monthly payroll generated for ${selectedMonth} across ${employees.length} employees.`);
+    setToastMessage(`Monthly payroll batch calculated for ${selectedMonth} across ${employees.length} personnel.`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleOpenSalarySetup = () => {
+    const targetEmp = employees.find((e) => e.employeeId === profileEmpId) || employees[0];
+    if (targetEmp) {
+      setProfileEmpId(targetEmp.employeeId);
+      setProfileBaseSalary(targetEmp.salary || 2500);
+      setProfilePenaltyPerMin(Number(((targetEmp.salary || 2500) / 22 / 480).toFixed(2)));
+    }
+    setIsSalarySetupOpen(true);
+  };
+
+  const handleSaveSalaryProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateEmployee(profileEmpId, { salary: Number(profileBaseSalary) });
+    setIsSalarySetupOpen(false);
+    setToastMessage(`Updated compensation profile for Employee #${profileEmpId} (Base: $${profileBaseSalary}/mo).`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   return (
@@ -123,6 +149,13 @@ export const PayrollPage: React.FC = () => {
                 >
                   <Play weight="fill" className="w-3.5 h-3.5" />
                   <span>Run Payroll</span>
+                </button>
+                <button
+                  onClick={handleOpenSalarySetup}
+                  title="Configure base salary and penalty multipliers (PayrollProfile)"
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                >
+                  <GearSix weight="bold" className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -394,6 +427,124 @@ export const PayrollPage: React.FC = () => {
                 <span>Print Payslip</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-slate-900 text-white text-xs shadow-xl flex items-center gap-3 animate-fadeIn">
+          <CheckCircle weight="fill" className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* MODAL: Compensation & Salary Profile Setup (PayrollProfile) */}
+      {isSalarySetupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200/80 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Compensation Rules (PayrollProfile)</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Backed by operation_service (/api/payroll/profiles)
+                </p>
+              </div>
+              <button
+                onClick={() => setIsSalarySetupOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+              >
+                <X weight="bold" className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSalaryProfile} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Target Employee
+                </label>
+                <select
+                  value={profileEmpId}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setProfileEmpId(id);
+                    const emp = employees.find((x) => x.employeeId === id);
+                    if (emp) {
+                      setProfileBaseSalary(emp.salary || 2500);
+                      setProfilePenaltyPerMin(Number(((emp.salary || 2500) / 22 / 480).toFixed(2)));
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                >
+                  {employees.map((emp) => (
+                    <option key={emp.employeeId} value={emp.employeeId}>
+                      {emp.firstName} {emp.lastName} (#{emp.employeeId}) • {emp.departmentName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Monthly Base Salary (USD)
+                  </label>
+                  <input
+                    type="number"
+                    value={profileBaseSalary}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setProfileBaseSalary(val);
+                      setProfilePenaltyPerMin(Number((val / 22 / 480).toFixed(2)));
+                    }}
+                    required
+                    className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Daily Rate (22 days)
+                  </label>
+                  <div className="w-full px-3 py-2 text-xs font-mono bg-slate-100 rounded-xl text-slate-600">
+                    ${(profileBaseSalary / 22).toFixed(2)}/day
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Late Penalty Rate (USD/minute)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={profilePenaltyPerMin}
+                  onChange={(e) => setProfilePenaltyPerMin(Number(e.target.value))}
+                  required
+                  className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Formula: Base / 22 days / 8 hrs / 60 mins = penalty deducted per unexcused late minute.
+                </span>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSalarySetupOpen(false)}
+                  className="px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold active:scale-[0.98] transition-all"
+                >
+                  Save Salary Profile
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

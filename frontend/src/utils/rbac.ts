@@ -115,6 +115,10 @@ export const isRoleAllowedForTab = (role: UserRole, tab: NavTab): boolean => {
     case 'employees':
     case 'profile':
       return true; // accessible to all, but internal view is contextually scoped
+    case 'departments':
+      return role === 'ROLE_ADMIN' || role === 'ROLE_HR';
+    case 'automations':
+      return role === 'ROLE_ADMIN' || role === 'ROLE_HR';
     case 'reports':
       return hasPermission(role, 'REPORTS_VIEW_EXECUTIVE');
     default:
@@ -130,6 +134,8 @@ export const getAllowedTabs = (role: UserRole): NavTab[] => {
     'dashboard',
     'attendance',
     'employees',
+    'departments',
+    'automations',
     'leaves',
     'payroll',
     'reports',
