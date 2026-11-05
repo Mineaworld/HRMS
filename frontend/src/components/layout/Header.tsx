@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   MagnifyingGlass,
   Bell,
@@ -8,14 +8,47 @@ import {
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
 import { getRoleBadge } from '../../utils/rbac';
+import { NotificationsMenu } from '../ui/notifications-menu';
 
 interface HeaderProps {
   onRaiseRequestClick?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
-  const { activeTab, setActiveTab, currentUser, searchQuery, setSearchQuery } = useHrmsStore();
+  const { activeTab, setActiveTab, currentUser, searchQuery, setSearchQuery, leaves, attendance } = useHrmsStore();
   const [isRaiseDropdownOpen, setIsRaiseDropdownOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('notif') === 'true'
+  );
+  const notifRef = useRef<HTMLDivElement>(null);
+  const raiseRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount =
+    leaves.filter((l) => l.status === 'PENDING').length +
+    attendance.filter((a) => a.status === 'LATE').length;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
+      if (raiseRef.current && !raiseRef.current.contains(event.target as Node)) {
+        setIsRaiseDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsNotificationsOpen(false);
+        setIsRaiseDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const getSectionTitle = (tab: NavTab) => {
     switch (tab) {
@@ -87,14 +120,38 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
 
         {/* Right Tools */}
         <div className="flex items-center gap-2.5">
-          {/* Notifications Button (40×40px desktop hit target) */}
-          <button
-            aria-label="View notifications"
-            className="relative w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 active:scale-[0.96] transition-transform duration-100 flex items-center justify-center shadow-2xs focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
-          >
-            <Bell weight="bold" className="w-4 h-4" />
-            <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-blue-600 ring-2 ring-white" />
-          </button>
+          {/* Notifications Popover Trigger */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              aria-label="View notifications"
+              aria-expanded={isNotificationsOpen}
+              aria-haspopup="true"
+              className={`relative w-10 h-10 rounded-xl border text-slate-600 hover:text-slate-900 active:scale-[0.96] transition-all duration-100 flex items-center justify-center shadow-2xs focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer ${
+                isNotificationsOpen
+                  ? 'bg-blue-50 border-blue-300 text-blue-600 shadow-sm'
+                  : 'bg-white border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Bell weight={isNotificationsOpen ? 'fill' : 'bold'} className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-blue-600 ring-2 ring-white animate-pulse" />
+              )}
+            </button>
+
+            {/* Notifications Popover with Polish Animation */}
+            {isNotificationsOpen && (
+              <div
+                className="absolute right-0 top-12 z-50 w-[420px] sm:w-[460px] origin-top-right transition-all duration-200 animate-in fade-in zoom-in-95"
+                style={{
+                  animationDuration: '180ms',
+                  animationTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                }}
+              >
+                <NotificationsMenu onClose={() => setIsNotificationsOpen(false)} />
+              </div>
+            )}
+          </div>
 
           {/* Verified Session Role & Account Pill (40px desktop hit target) */}
           <button
@@ -111,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
           </button>
 
           {/* New Request Button (40px desktop hit target) */}
-          <div className="relative">
+          <div className="relative" ref={raiseRef}>
             <button
               onClick={() => {
                 if (onRaiseRequestClick) {
@@ -130,7 +187,13 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
             </button>
 
             {isRaiseDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-xl border border-slate-200/90 p-1.5 z-50">
+              <div
+                className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-xl border border-slate-200/90 p-1.5 z-50 origin-top-right transition-all duration-200 animate-in fade-in zoom-in-95"
+                style={{
+                  animationDuration: '180ms',
+                  animationTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                }}
+              >
                 <button
                   onClick={() => {
                     setIsRaiseDropdownOpen(false);

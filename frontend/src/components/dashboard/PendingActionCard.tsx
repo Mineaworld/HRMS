@@ -5,11 +5,12 @@ import {
   Funnel,
   CheckCircle,
   ArrowRight,
+  Cpu,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../../store/useHrmsStore';
 
 export const PendingActionCard: React.FC = () => {
-  const { pendingActions, setActiveTab: navigateTab } = useHrmsStore();
+  const { pendingActions, cronHistory, setActiveTab: navigateTab } = useHrmsStore();
   const [activeTab, setActiveTab] = useState<'tasks' | 'notifications'>('tasks');
   const [filterMode, setFilterMode] = useState<'all' | 'priority'>('all');
 
@@ -138,7 +139,7 @@ export const PendingActionCard: React.FC = () => {
               );
             })
           )
-        ) : (
+        ) : cronHistory.length === 0 ? (
           <div className="py-10 flex flex-col items-center justify-center text-center">
             <div className="w-12 h-12 rounded-2xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-400 mb-2.5 shadow-xs">
               <CheckCircle weight="duotone" className="w-6 h-6 text-slate-400" />
@@ -147,6 +148,30 @@ export const PendingActionCard: React.FC = () => {
             <p className="text-[11px] text-slate-400 mt-1 max-w-[210px] leading-relaxed">
               All staff telemetry and system dispatch notifications have been reviewed.
             </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {cronHistory.slice(0, 3).map((job) => (
+              <div
+                key={job.id}
+                className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-slate-50 transition-colors flex items-start gap-3"
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-900 text-blue-400 flex items-center justify-center shrink-0 shadow-xs">
+                  <Cpu weight="duotone" className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-900 truncate">{job.jobName}</span>
+                    <span className="text-[10px] font-mono text-slate-400">{job.durationMs}ms</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">{job.message}</p>
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                    <span>{job.executionTime || 'Recent execution'}</span>
+                    <span className="text-emerald-600 font-bold font-sans">COMPLETED</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
