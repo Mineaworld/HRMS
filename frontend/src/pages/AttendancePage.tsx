@@ -6,14 +6,10 @@ import {
   CalendarCheck,
   WarningCircle,
   CheckCircle,
-  Plus,
   UserCheck,
   ClockCountdown,
   ShieldCheck,
-  X,
   PencilSimple,
-  ArrowRight,
-  Sparkle,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { hasPermission } from '../utils/rbac';

@@ -1,6 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,15 +9,8 @@ import {
   Check,
   CheckCircle,
   X,
-  XCircle,
-  Clock,
-  WarningCircle,
-  CalendarCheck,
-  CurrencyDollar,
   Cpu,
   ArrowRight,
-  ShieldCheck,
-  SlidersHorizontal,
 } from "@phosphor-icons/react";
 
 export type NotificationType = "leave" | "attendance" | "payroll" | "system";
@@ -58,7 +50,6 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = ({
     leaves,
     attendance,
     cronHistory,
-    currentUser,
     updateLeaveStatus,
     setActiveTab,
   } = useHrmsStore();
@@ -137,7 +128,6 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = ({
     // 3. System Automations & Scheduled CRON Jobs
     cronHistory.slice(0, 3).forEach((c) => {
       const id = `notif-cron-${c.id}`;
-      const isSuccess = c.status === "SUCCESS";
       list.push({
         id,
         type: "system",
@@ -205,7 +195,6 @@ export const NotificationsMenu: React.FC<NotificationsMenuProps> = ({
   const unreadCount = liveNotifications.filter((n) => !n.isRead).length;
   const leaveCount = liveNotifications.filter((n) => n.type === "leave" && !n.isRead).length;
   const attendanceCount = liveNotifications.filter((n) => n.type === "attendance" && !n.isRead).length;
-  const systemCount = liveNotifications.filter((n) => n.type === "system" && !n.isRead).length;
 
   return (
     <Card

@@ -7,7 +7,6 @@ import {
   CurrencyCircleDollar,
   LockKey,
   ShieldCheck,
-  ArrowRight,
   House,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';

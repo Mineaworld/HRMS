@@ -5,7 +5,6 @@ import {
   CheckCircle,
   CalendarCheck,
   Briefcase,
-  TreeStructure,
 } from '@phosphor-icons/react';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { PendingActionCard } from '../components/dashboard/PendingActionCard';

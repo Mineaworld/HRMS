@@ -6,8 +6,6 @@ import {
   ShieldCheck,
   SignOut,
   CheckCircle,
-  Key,
-  Lock,
   CaretDown,
   CaretUp,
   Fingerprint,

@@ -15,7 +15,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
-  const { activeTab, setActiveTab, currentUser, searchQuery, setSearchQuery, leaves, attendance } = useHrmsStore();
+  const { activeTab, setActiveTab, currentUser, leaves, attendance } = useHrmsStore();
   const [isRaiseDropdownOpen, setIsRaiseDropdownOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(() =>
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('notif') === 'true'

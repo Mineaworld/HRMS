@@ -19,7 +19,7 @@ import {
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { UserRole, UserAccount } from '../types';
-import { ROLE_PERSONAS, getRoleBadge } from '../utils/rbac';
+import { ROLE_PERSONAS } from '../utils/rbac';
 import { authApi, TokenResponse } from '../api';
 import { Modal } from '../components/ui/modal';
 

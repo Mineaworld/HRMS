@@ -3,19 +3,16 @@ import {
   Buildings,
   Plus,
   MagnifyingGlass,
-  UsersThree,
-  CurrencyDollar,
   Trash,
   PencilSimple,
   X,
   WarningCircle,
-  CheckCircle,
   ArrowRight,
   ShieldCheck,
   User,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
-import { Department, Employee } from '../types';
+import { Department } from '../types';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
 import { Modal, Drawer } from '../components/ui/modal';
 

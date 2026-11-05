@@ -4,7 +4,6 @@ import {
   Play,
   FileText,
   Printer,
-  X,
   CheckCircle,
   Clock,
   Receipt,
@@ -32,7 +31,6 @@ export const PayrollPage: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const canViewAll = hasPermission(currentUser.role, 'PAYROLL_VIEW_ALL');
-  const canGenerate = hasPermission(currentUser.role, 'PAYROLL_GENERATE_BATCH');
   const canMarkPaid = hasPermission(currentUser.role, 'PAYROLL_MARK_PAID');
   const myEmployeeId = currentUser.employeeId || 1;
 

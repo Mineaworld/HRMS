@@ -10,14 +10,10 @@ import {
   Clock,
   TreeStructure,
   ChartLineUp,
-  FileText,
   House,
   ArrowRight,
-  Briefcase,
-  CheckCircle,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
-import { hasPermission } from '../../utils/rbac';
 
 interface SearchItem {
   id: string;
@@ -38,7 +34,6 @@ export const GlobalSearch: React.FC = () => {
     employees,
     departments,
     leaves,
-    currentUser,
     setActiveTab,
   } = useHrmsStore();
 
@@ -61,8 +56,6 @@ export const GlobalSearch: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const canViewSalary = hasPermission(currentUser.role, 'EMPLOYEE_VIEW_SALARY');
 
   // Navigation pages list
   const navPages = useMemo(

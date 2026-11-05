@@ -9,7 +9,6 @@ import {
   PendingAction,
   Announcement,
   UserAccount,
-  UserRole,
   JobExecution,
   AttendanceCorrection,
 } from '../types';
@@ -23,7 +22,7 @@ import {
   cronApi,
   reportApi,
 } from '../api';
-import { ROLE_PERSONAS, isRoleAllowedForTab } from '../utils/rbac';
+import { ROLE_PERSONAS } from '../utils/rbac';
 
 export type NavTab =
   | 'dashboard'
