@@ -1,26 +1,43 @@
 import React, { useState } from 'react';
 import { Calendar } from '../ui/calendar';
 import { CalendarDots, Sparkle } from '@phosphor-icons/react';
+import { useHrmsStore } from '../../store/useHrmsStore';
 
 export const EventCalendarCard: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2026, 0, 15));
+  const { leaves } = useHrmsStore();
+  const today = new Date();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(today);
 
-  // Key event dates for company milestones matching announcements
-  const eventDates = [
-    new Date(2026, 0, 15),
-    new Date(2026, 0, 18),
-    new Date(2026, 0, 20),
-    new Date(2026, 0, 27),
-  ];
-
+  // Derive real event markers from company payroll schedule (28th) and real leaves
   const hasEventOnDate = (date: Date) => {
-    return eventDates.some(
-      (d) =>
-        d.getDate() === date.getDate() &&
-        d.getMonth() === date.getMonth() &&
-        d.getFullYear() === date.getFullYear()
-    );
+    // Monthly payroll batch cadence
+    if (date.getDate() === 28) return true;
+
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const dStr = `${y}-${m}-${d}`;
+
+    return leaves.some((l) => {
+      if (!l.startDate) return false;
+      const end = l.endDate || l.startDate;
+      return dStr >= l.startDate && dStr <= end;
+    });
   };
+
+  const currentQuarter = `Q${Math.floor(today.getMonth() / 3) + 1} ${today.getFullYear()}`;
+
+  const selectedDateStr = selectedDate
+    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(
+        selectedDate.getDate()
+      ).padStart(2, '0')}`
+    : '';
+
+  const leavesOnSelectedDate = leaves.filter((l) => {
+    if (!selectedDateStr || !l.startDate) return false;
+    const end = l.endDate || l.startDate;
+    return selectedDateStr >= l.startDate && selectedDateStr <= end;
+  });
 
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col h-full justify-between">
@@ -29,11 +46,11 @@ export const EventCalendarCard: React.FC = () => {
         <div className="flex items-center gap-2">
           <CalendarDots weight="duotone" className="w-4 h-4 text-blue-600" />
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-            Event Calendar
+            Schedule & Events
           </h2>
         </div>
         <span className="text-[10px] font-mono font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-          Q1 2026
+          {currentQuarter}
         </span>
       </div>
 
@@ -43,7 +60,7 @@ export const EventCalendarCard: React.FC = () => {
           mode="single"
           selected={selectedDate}
           onSelect={setSelectedDate}
-          defaultMonth={new Date(2026, 0)}
+          defaultMonth={today}
           className="p-0 select-none"
           modifiers={{
             hasEvent: (date) => hasEventOnDate(date),
@@ -67,10 +84,20 @@ export const EventCalendarCard: React.FC = () => {
                 })
               : 'Select date'}
           </span>
+          {leavesOnSelectedDate.length > 0 && (
+            <span className="ml-1.5 text-blue-600 font-medium">
+              ({leavesOnSelectedDate.length} leave{leavesOnSelectedDate.length > 1 ? 's' : ''})
+            </span>
+          )}
+          {selectedDate?.getDate() === 28 && (
+            <span className="ml-1.5 text-emerald-600 font-medium font-mono">
+              [Payroll Run]
+            </span>
+          )}
         </div>
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
           <Sparkle weight="fill" className="w-2.5 h-2.5 text-emerald-600" />
-          <span>Active schedule</span>
+          <span>Operational</span>
         </span>
       </div>
     </div>

@@ -23,37 +23,6 @@ import { ROLE_PERSONAS, getRoleBadge } from '../utils/rbac';
 import { authApi, TokenResponse } from '../api';
 import { Modal } from '../components/ui/modal';
 
-interface PresetAccount {
-  userName: string;
-  role: UserRole;
-  passwordHint: string;
-  badgeLabel: string;
-  displayName: string;
-}
-
-const PRESET_ACCOUNTS: PresetAccount[] = [
-  {
-    userName: 'sysadmin',
-    role: 'ROLE_ADMIN',
-    passwordHint: 'Ahsva@087',
-    badgeLabel: 'ADMIN',
-    displayName: 'System Administrator',
-  },
-  {
-    userName: 'sarah.jenkins',
-    role: 'ROLE_HR',
-    passwordHint: 'Hr@1234',
-    badgeLabel: 'HR MANAGER',
-    displayName: 'Sarah Jenkins',
-  },
-  {
-    userName: 'sophea.chan',
-    role: 'ROLE_EMPLOYEE',
-    passwordHint: 'Staff@1234',
-    badgeLabel: 'STAFF MEMBER',
-    displayName: 'Sophea Chan',
-  },
-];
 
 export const LoginPage: React.FC = () => {
   const { login } = useHrmsStore();
@@ -98,17 +67,6 @@ export const LoginPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [mode]);
 
-  const handlePresetSelect = (preset: PresetAccount, autoSubmit = false) => {
-    setUserName(preset.userName);
-    setPassword(preset.passwordHint);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    if (autoSubmit) {
-      performLogin(preset.userName, preset.passwordHint);
-    }
-  };
-
   const normalizeRole = (r?: string): UserRole => {
     if (!r) return 'ROLE_EMPLOYEE';
     const upper = r.toUpperCase();
@@ -124,12 +82,8 @@ export const LoginPage: React.FC = () => {
     accountIdFromApi?: number,
     employeeIdFromApi?: number | null
   ): UserAccount => {
-    const matchedPreset = PRESET_ACCOUNTS.find(
-      (p) => p.userName.toLowerCase() === uName.toLowerCase()
-    );
     const role: UserRole = normalizeRole(
       roleFromApi ||
-        matchedPreset?.role ||
         (uName.toLowerCase().includes('admin')
           ? 'ROLE_ADMIN'
           : uName.toLowerCase().includes('hr')
@@ -139,14 +93,14 @@ export const LoginPage: React.FC = () => {
     const persona = ROLE_PERSONAS[role];
 
     return {
-      accountId:
-        accountIdFromApi ??
-        (role === 'ROLE_ADMIN' ? 4 : role === 'ROLE_HR' ? 102 : 103),
+      accountId: accountIdFromApi ?? (role === 'ROLE_ADMIN' ? 4 : 1),
       userName: uName,
       fullName:
         uName === 'sysadmin'
           ? 'System Administrator'
-          : matchedPreset?.displayName || persona?.fullName || uName,
+          : uName === 'admin'
+          ? 'HR Administrator'
+          : persona?.fullName || uName,
       email:
         emailFromApi ||
         (uName === 'sysadmin'
@@ -753,71 +707,21 @@ export const LoginPage: React.FC = () => {
             </form>
           )}
 
-          {/* Quick Demo Personas Bar */}
-          <div className="pt-4 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                1-Click Demo Personas
-              </span>
-              <span className="text-[10px] text-blue-600 font-mono font-medium">
-                Live Gateway & DB
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {PRESET_ACCOUNTS.map((preset) => {
-                const persona = ROLE_PERSONAS[preset.role];
-                const badge = getRoleBadge(preset.role);
-                const isSelected = userName === preset.userName;
-
-                return (
-                  <div
-                    key={preset.userName}
-                    onClick={() => handlePresetSelect(preset, false)}
-                    className={`flex items-center justify-between p-2 rounded-xl border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-50/70 border-blue-200 shadow-xs'
-                        : 'bg-slate-50/60 border-slate-100 hover:bg-slate-100/70 hover:border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <img
-                        src={persona.avatarUrl}
-                        alt={preset.displayName}
-                        className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 flex-shrink-0"
-                      />
-                      <div className="min-w-0 text-left">
-                        <div className="text-xs font-semibold text-slate-900 truncate">
-                          {preset.displayName}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono truncate">
-                          {preset.userName}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${badge.badgeClass}`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${badge.dotClass}`} />
-                        <span>{preset.badgeLabel}</span>
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePresetSelect(preset, true);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-xs"
-                      >
-                        Sign In
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Default Enterprise Access Credentials */}
+          <div className="pt-4 border-t border-slate-100/90 text-center">
+            <div className="text-[11px] text-slate-400">
+              Authorized System Administrator:{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setUserName('sysadmin');
+                  setPassword('Ahsva@087');
+                }}
+                className="font-mono text-slate-700 font-semibold bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                title="Fill sysadmin credentials"
+              >
+                sysadmin
+              </button>
             </div>
           </div>
         </div>

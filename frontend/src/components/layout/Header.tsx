@@ -18,8 +18,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
-  const { activeTab, currentUser, setUserRole, searchQuery, setSearchQuery } = useHrmsStore();
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const { activeTab, setActiveTab, currentUser, searchQuery, setSearchQuery } = useHrmsStore();
   const [isRaiseDropdownOpen, setIsRaiseDropdownOpen] = useState(false);
 
   const getSectionTitle = (tab: NavTab) => {
@@ -70,27 +69,6 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
 
   const roleBadge = getRoleBadge(currentUser.role);
 
-  const roles: { id: UserRole; label: string; desc: string; icon: any }[] = [
-    {
-      id: 'ROLE_ADMIN',
-      label: 'Administrator',
-      desc: 'Full Governance & Batch Payroll',
-      icon: ShieldCheck,
-    },
-    {
-      id: 'ROLE_HR',
-      label: 'HR Manager',
-      desc: 'Roster, Attendance & Leave Approvals',
-      icon: UserCheck,
-    },
-    {
-      id: 'ROLE_EMPLOYEE',
-      label: 'Staff Member',
-      desc: 'Personal Punch, Leaves & Payslips',
-      icon: User,
-    },
-  ];
-
   return (
     <header className="sticky top-0 z-20 flex flex-col gap-4 px-8 pt-5 pb-4 bg-[#eaf1f7]/90 backdrop-blur-md border-b border-slate-200/60 select-none">
       {/* Top Utility Bar */}
@@ -122,86 +100,19 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
           </button>
 
-          {/* Senior Enterprise RBAC Switcher */}
-          <div className="relative">
-            <button
-              onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-              aria-label="Switch active demonstration role"
-              aria-expanded={isRoleDropdownOpen}
-              aria-haspopup="true"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:border-slate-300 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-            >
-              <span className={`w-2 h-2 rounded-full ${roleBadge.dotClass} animate-pulse`} />
-              <span className="font-mono text-[11px] tracking-tight font-bold">{roleBadge.shortTag}</span>
-              <CaretDown weight="bold" className="w-3 h-3 text-slate-400" />
-            </button>
-
-            {isRoleDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-slate-200/80 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                <div className="px-3.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Switch RBAC Role
-                  </span>
-                  <span className="text-[10px] text-blue-600 font-mono">Gateway JWT</span>
-                </div>
-                <div className="p-1 space-y-0.5">
-                  {roles.map((r) => {
-                    const Icon = r.icon;
-                    const isSelected = currentUser.role === r.id;
-                    return (
-                      <button
-                        key={r.id}
-                        onClick={() => {
-                          setUserRole(r.id);
-                          setIsRoleDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
-                          isSelected
-                            ? 'bg-slate-900 text-white'
-                            : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                            isSelected
-                              ? 'bg-white/20 text-white'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          <Icon weight={isSelected ? 'fill' : 'duotone'} className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold leading-tight truncate">
-                              {r.label}
-                            </span>
-                            <span
-                              className={`text-[9px] font-mono px-1 rounded uppercase ${
-                                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                              }`}
-                            >
-                              {r.id.replace('ROLE_', '')}
-                            </span>
-                          </div>
-                          <p
-                            className={`text-[10px] mt-0.5 leading-tight truncate ${
-                              isSelected ? 'text-slate-300' : 'text-slate-400'
-                            }`}
-                          >
-                            {r.desc}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="px-3.5 pt-2 pb-1 border-t border-slate-100 text-[10px] text-slate-400 flex items-center gap-1.5">
-                  <Key weight="bold" className="w-3 h-3 text-slate-400" />
-                  <span>Authority claims routed via Gateway (:8080)</span>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Verified Session Role & Account Pill */}
+          <button
+            onClick={() => setActiveTab('profile')}
+            title="View account credentials and authorities"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:border-slate-300 shadow-xs transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
+          >
+            <span className={`w-2 h-2 rounded-full ${roleBadge.dotClass}`} />
+            <span className="font-mono text-[11px] tracking-tight font-bold">{roleBadge.shortTag}</span>
+            <span className="text-slate-200">|</span>
+            <span className="text-slate-600 font-medium text-[11px] truncate max-w-[120px]">
+              {currentUser.userName}
+            </span>
+          </button>
 
           {/* New Request Button */}
           <div className="relative">

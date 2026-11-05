@@ -17,7 +17,7 @@ import { TimesheetSummaryChart } from '../components/dashboard/TimesheetSummaryC
 import { hasPermission } from '../utils/rbac';
 
 export const ReportsPage: React.FC = () => {
-  const { employees, departments, payroll, currentUser, setUserRole, setActiveTab } = useHrmsStore();
+  const { employees, departments, payroll, currentUser, setActiveTab } = useHrmsStore();
 
   const hasAccess = hasPermission(currentUser.role, 'REPORTS_VIEW_EXECUTIVE');
 
@@ -47,26 +47,19 @@ export const ReportsPage: React.FC = () => {
             <span className="font-mono text-[10px] text-rose-600 font-bold">HTTP 403 FORBIDDEN</span>
           </div>
           <div className="text-slate-600 text-[11px] font-mono space-y-1">
-            <div><span className="text-slate-400">Target:</span> GET /api/reports/dashboard</div>
+            <div><span className="text-slate-400">Target:</span> GET /api/report/dashboard</div>
             <div><span className="text-slate-400">Required:</span> hasAnyRole('ADMIN', 'HR_MANAGER')</div>
-            <div><span className="text-slate-400">Caller:</span> {currentUser.fullName} ({currentUser.email})</div>
+            <div><span className="text-slate-400">Account:</span> {currentUser.fullName} ({currentUser.userName})</div>
           </div>
         </div>
 
         <div className="flex items-center justify-center gap-3 pt-2">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
           >
             <House weight="bold" className="w-4 h-4" />
-            <span>Back to Dashboard</span>
-          </button>
-          <button
-            onClick={() => setUserRole('ROLE_ADMIN')}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors"
-          >
-            <span>Switch to Admin Persona</span>
-            <ArrowRight weight="bold" className="w-4 h-4" />
+            <span>Return to Dashboard</span>
           </button>
         </div>
       </div>
@@ -74,6 +67,22 @@ export const ReportsPage: React.FC = () => {
   }
 
   const totalPayroll = payroll.reduce((acc, p) => acc + p.netSalary, 0);
+
+  const handleExportCsv = () => {
+    const headers = ['Employee ID,First Name,Last Name,Email,Department,Job Title,Status,Salary'];
+    const rows = employees.map(
+      (e) =>
+        `${e.employeeId},"${e.firstName}","${e.lastName}","${e.email}","${e.departmentName}","${e.jobTitle}",${e.status},${e.salary}`
+    );
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `hrms_workforce_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -92,11 +101,11 @@ export const ReportsPage: React.FC = () => {
         </div>
 
         <button
-          onClick={() => alert('Exporting complete HRMS Executive Report as CSV / PDF...')}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors"
+          onClick={handleExportCsv}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
         >
           <DownloadSimple weight="bold" className="w-4 h-4" />
-          <span>Export Summary Report</span>
+          <span>Export Workforce CSV</span>
         </button>
       </div>
 

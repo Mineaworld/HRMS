@@ -20,7 +20,8 @@ import { hasPermission } from '../utils/rbac';
 
 export const PayrollPage: React.FC = () => {
   const { payroll, employees, generateMonthlyPayroll, markPayrollPaid, currentUser, updateEmployee } = useHrmsStore();
-  const [selectedMonth, setSelectedMonth] = useState('January 2026');
+  const currentMonthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthName);
   const [viewingPayslip, setViewingPayslip] = useState<PayrollRecord | null>(null);
 
   // Salary Setup Modal State (PayrollProfile)

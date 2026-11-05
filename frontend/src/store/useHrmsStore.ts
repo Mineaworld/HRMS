@@ -54,7 +54,6 @@ interface HrmsState {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   currentUser: UserAccount;
-  setUserRole: (role: UserRole) => void;
 
   // Search & Filter
   searchQuery: string;
@@ -111,9 +110,6 @@ interface HrmsState {
   // Payroll Operations
   generateMonthlyPayroll: (periodMonth: string) => Promise<ActionResult>;
   markPayrollPaid: (recordId: number) => Promise<ActionResult>;
-
-  // Demo Reset
-  resetDemoData: () => void;
 }
 
 export const useHrmsStore = create<HrmsState>((set, get) => {
@@ -183,31 +179,6 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     activeTab: 'dashboard',
     setActiveTab: (tab) => set({ activeTab: tab }),
     currentUser: initialUser,
-    setUserRole: (role) => {
-      set((state) => {
-        const persona = ROLE_PERSONAS[role];
-        const updatedUser: UserAccount = {
-          ...state.currentUser,
-          role,
-          fullName: persona ? persona.fullName : state.currentUser.fullName,
-          email: persona ? persona.email : state.currentUser.email,
-          avatarUrl: persona ? persona.avatarUrl : state.currentUser.avatarUrl,
-          employeeId: persona ? persona.employeeId : state.currentUser.employeeId,
-        };
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('hrms_user', JSON.stringify(updatedUser));
-        }
-
-        let nextTab = state.activeTab;
-        if (!isRoleAllowedForTab(role, state.activeTab)) {
-          nextTab = 'dashboard';
-        }
-
-        return { currentUser: updatedUser, activeTab: nextTab };
-      });
-      // Re-sync with Gateway under new role context
-      get().syncWithGateway();
-    },
 
     // Global Search Query
     searchQuery: '',
@@ -1042,25 +1013,6 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         ),
       }));
       return { success: true };
-    },
-
-    // ==========================================
-    // Demo Reset
-    // ==========================================
-    resetDemoData: () => {
-      set({
-        employees: [],
-        departments: [],
-        jobs: [],
-        attendance: [],
-        leaves: [],
-        payroll: [],
-        cronHistory: [],
-        dashboardSummary: null,
-        pendingActions: [],
-        announcements: [],
-      });
-      get().syncWithGateway();
     },
   };
 });
