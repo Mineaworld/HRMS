@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  MagnifyingGlass,
   Bell,
   Plus,
   CalendarPlus,
@@ -9,6 +8,7 @@ import {
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
 import { getRoleBadge } from '../../utils/rbac';
 import { NotificationsMenu } from '../ui/notifications-menu';
+import { GlobalSearch } from './GlobalSearch';
 
 interface HeaderProps {
   onRaiseRequestClick?: () => void;
@@ -102,21 +102,8 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
     <header className="sticky top-0 z-20 flex flex-col gap-4 px-8 pt-5 pb-4 bg-[#eaf1f7]/90 backdrop-blur-md border-b border-slate-200/60 select-none">
       {/* Top Utility Bar */}
       <div className="flex items-center justify-between gap-4">
-        {/* Search Input (40px desktop hit target) */}
-        <div className="relative w-80">
-          <MagnifyingGlass weight="bold" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            aria-label="Search employees, departments, or records"
-            placeholder="Search employees or press /"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-9 pr-9 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
-          />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md bg-slate-100 text-[10px] font-mono text-slate-400 border border-slate-200">
-            /
-          </kbd>
-        </div>
+        {/* Global Search Command Bar with Live Dropdown & Keyboard Shortcuts */}
+        <GlobalSearch />
 
         {/* Right Tools */}
         <div className="flex items-center gap-2.5">

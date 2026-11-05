@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Buildings,
   Plus,
@@ -20,10 +20,14 @@ import { BehavioralHistorySelect } from '../components/ui/behavioral-history-sel
 import { Modal, Drawer } from '../components/ui/modal';
 
 export const DepartmentsPage: React.FC = () => {
-  const { departments, employees, addDepartment, updateDepartment, deleteDepartment, currentUser } =
+  const { departments, employees, addDepartment, updateDepartment, deleteDepartment, currentUser, searchQuery: globalQuery } =
     useHrmsStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(globalQuery);
+
+  useEffect(() => {
+    if (globalQuery) setSearchQuery(globalQuery);
+  }, [globalQuery]);
   const [selectedDeptForRoster, setSelectedDeptForRoster] = useState<Department | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);

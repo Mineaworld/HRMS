@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UsersThree,
   UserPlus,
@@ -18,11 +18,15 @@ import { Modal } from '../components/ui/modal';
 import { hasPermission } from '../utils/rbac';
 
 export const EmployeesPage: React.FC = () => {
-  const { employees, departments, addEmployee, deleteEmployee, currentUser } = useHrmsStore();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { employees, departments, addEmployee, deleteEmployee, currentUser, searchQuery } = useHrmsStore();
+  const [searchTerm, setSearchTerm] = useState(searchQuery);
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSearchTerm(searchQuery);
+  }, [searchQuery]);
 
   // Form State
   const [formData, setFormData] = useState({
