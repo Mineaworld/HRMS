@@ -2,15 +2,11 @@ import React, { useState } from 'react';
 import {
   MagnifyingGlass,
   Bell,
-  CaretDown,
   Plus,
-  ShieldCheck,
-  UserCheck,
-  User,
-  Key,
+  CalendarPlus,
+  ClockAfternoon,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
-import { UserRole } from '../../types';
 import { getRoleBadge } from '../../utils/rbac';
 
 interface HeaderProps {
@@ -47,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
   const getSectionSubtitle = (tab: NavTab) => {
     switch (tab) {
       case 'dashboard':
-        return 'Daily headcount, active tasks, and attendance analytics';
+        return 'Daily headcount, operational schedule, and punctuality analytics';
       case 'attendance':
         return 'Time tracking, late arrival audit, and overtime logs';
       case 'timesheet':
@@ -73,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
     <header className="sticky top-0 z-20 flex flex-col gap-4 px-8 pt-5 pb-4 bg-[#eaf1f7]/90 backdrop-blur-md border-b border-slate-200/60 select-none">
       {/* Top Utility Bar */}
       <div className="flex items-center justify-between gap-4">
-        {/* Search */}
+        {/* Search Input (40px desktop hit target) */}
         <div className="relative w-80">
           <MagnifyingGlass weight="bold" className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -82,29 +78,29 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
             placeholder="Search employees or press /"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-9 py-2 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors"
+            className="w-full h-10 pl-9 pr-9 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-colors shadow-2xs"
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-400 border border-slate-200">
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md bg-slate-100 text-[10px] font-mono text-slate-400 border border-slate-200">
             /
           </kbd>
         </div>
 
         {/* Right Tools */}
         <div className="flex items-center gap-2.5">
-          {/* Notifications */}
+          {/* Notifications Button (40×40px desktop hit target) */}
           <button
             aria-label="View notifications"
-            className="relative p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="relative w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 active:scale-[0.96] transition-transform duration-100 flex items-center justify-center shadow-2xs focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
           >
             <Bell weight="bold" className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+            <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-blue-600 ring-2 ring-white" />
           </button>
 
-          {/* Verified Session Role & Account Pill */}
+          {/* Verified Session Role & Account Pill (40px desktop hit target) */}
           <button
             onClick={() => setActiveTab('profile')}
             title="View account credentials and authorities"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:border-slate-300 shadow-xs transition-all focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
+            className="flex items-center gap-2 h-10 px-3.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:border-slate-300 shadow-2xs active:scale-[0.96] transition-transform duration-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
           >
             <span className={`w-2 h-2 rounded-full ${roleBadge.dotClass}`} />
             <span className="font-mono text-[11px] tracking-tight font-bold">{roleBadge.shortTag}</span>
@@ -114,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
             </span>
           </button>
 
-          {/* New Request Button */}
+          {/* New Request Button (40px desktop hit target) */}
           <div className="relative">
             <button
               onClick={() => {
@@ -127,31 +123,37 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
               aria-label="Create request"
               aria-expanded={isRaiseDropdownOpen}
               aria-haspopup="true"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              className="flex items-center gap-1.5 h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.96] text-white text-xs font-medium transition-transform duration-100 shadow-2xs focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
             >
               <Plus weight="bold" className="w-3.5 h-3.5" />
               <span>New request</span>
             </button>
 
             {isRaiseDropdownOpen && (
-              <div className="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg border border-slate-200 py-1 z-50">
+              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-xl border border-slate-200/90 p-1.5 z-50">
                 <button
                   onClick={() => {
                     setIsRaiseDropdownOpen(false);
-                    if (onRaiseRequestClick) onRaiseRequestClick();
+                    if (onRaiseRequestClick) {
+                      onRaiseRequestClick();
+                    } else {
+                      setActiveTab('leaves');
+                    }
                   }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                  className="w-full flex items-center gap-2 text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg active:scale-[0.96] transition-transform duration-100 cursor-pointer"
                 >
-                  Apply for leave
+                  <CalendarPlus weight="bold" className="w-4 h-4 text-blue-600" />
+                  <span>Apply for leave</span>
                 </button>
                 <button
                   onClick={() => {
                     setIsRaiseDropdownOpen(false);
-                    alert('Attendance correction form opened');
+                    setActiveTab('attendance');
                   }}
-                  className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                  className="w-full flex items-center gap-2 text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg active:scale-[0.96] transition-transform duration-100 cursor-pointer"
                 >
-                  Request attendance correction
+                  <ClockAfternoon weight="bold" className="w-4 h-4 text-amber-600" />
+                  <span>Request attendance correction</span>
                 </button>
               </div>
             )}

@@ -9,10 +9,8 @@ import {
 } from '@phosphor-icons/react';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { PendingActionCard } from '../components/dashboard/PendingActionCard';
-import { AnnouncementCard } from '../components/dashboard/AnnouncementCard';
 import { EventCalendarCard } from '../components/dashboard/EventCalendarCard';
 import { LeaveSummaryChart } from '../components/dashboard/LeaveSummaryChart';
-import { TimesheetSummaryChart } from '../components/dashboard/TimesheetSummaryChart';
 import { AttendanceSummaryChart } from '../components/dashboard/AttendanceSummaryChart';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { getRoleBadge } from '../utils/rbac';
@@ -93,28 +91,22 @@ export const DashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* 2. Middle Row (3 Widget Cards) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="min-h-[310px]">
+      {/* 2. Middle Row (2 Widget Cards: Pending Actions & Operational Schedule) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="min-h-[320px]">
           <PendingActionCard />
         </div>
-        <div className="min-h-[310px]">
-          <AnnouncementCard />
-        </div>
-        <div className="min-h-[310px]">
+        <div className="min-h-[320px]">
           <EventCalendarCard />
         </div>
       </div>
 
-      {/* 3. Bottom Row (3 Chart Analytics Cards) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="min-h-[260px]">
+      {/* 3. Bottom Row (2 High-Impact Analytics Charts: Real Leave & Attendance Telemetry) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="min-h-[280px]">
           <LeaveSummaryChart />
         </div>
-        <div className="min-h-[260px]">
-          <TimesheetSummaryChart />
-        </div>
-        <div className="min-h-[260px]">
+        <div className="min-h-[280px]">
           <AttendanceSummaryChart />
         </div>
       </div>

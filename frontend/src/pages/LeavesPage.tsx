@@ -23,6 +23,7 @@ import { hasPermission } from '../utils/rbac';
 export const LeavesPage: React.FC = () => {
   const { leaves, currentUser, submitLeaveRequest, updateLeaveStatus, cancelLeaveRequest } = useHrmsStore();
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const canApprove = hasPermission(currentUser.role, 'LEAVE_APPROVE_REJECT');
   const canViewAll = hasPermission(currentUser.role, 'LEAVE_VIEW_ALL');
@@ -42,8 +43,8 @@ export const LeavesPage: React.FC = () => {
 
   const handleApply = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.reason) {
-      alert('Please state a reason for your leave application');
+    if (!formData.reason.trim()) {
+      setFormError('Please state a reason for your leave application');
       return;
     }
 
@@ -54,10 +55,11 @@ export const LeavesPage: React.FC = () => {
       startDate: formData.startDate,
       endDate: formData.endDate,
       daysCount: Number(formData.daysCount),
-      reason: formData.reason,
+      reason: formData.reason.trim(),
     });
 
     setIsApplyModalOpen(false);
+    setFormError(null);
     setFormData({
       leaveType: 'Casual Leave',
       startDate: new Date().toISOString().split('T')[0],
@@ -143,9 +145,12 @@ export const LeavesPage: React.FC = () => {
           </div>
           <div className="mt-3">
             <button
-              onClick={() => setIsApplyModalOpen(true)}
+              onClick={() => {
+                setFormError(null);
+                setIsApplyModalOpen(true);
+              }}
               aria-label="Open leave application dialog"
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              className="w-full flex items-center justify-center gap-2 min-h-[40px] py-2 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.96] text-white text-xs font-semibold shadow-sm transition-transform duration-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
             >
               <Plus weight="bold" className="w-4 h-4" />
               <span>Apply for Leave</span>
@@ -226,7 +231,7 @@ export const LeavesPage: React.FC = () => {
                           <button
                             onClick={() => updateLeaveStatus(leave.leaveId, 'APPROVED')}
                             aria-label={`Approve leave for ${leave.employeeName}`}
-                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+                            className="min-w-[36px] min-h-[36px] p-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-[0.96] transition-transform duration-100 flex items-center justify-center focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer"
                             title="Approve Leave (HR Clearance)"
                           >
                             <Check weight="bold" className="w-4 h-4" />
@@ -234,7 +239,7 @@ export const LeavesPage: React.FC = () => {
                           <button
                             onClick={() => updateLeaveStatus(leave.leaveId, 'REJECTED')}
                             aria-label={`Reject leave for ${leave.employeeName}`}
-                            className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
+                            className="min-w-[36px] min-h-[36px] p-2 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 active:scale-[0.96] transition-transform duration-100 flex items-center justify-center focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer"
                             title="Reject Leave (HR Clearance)"
                           >
                             <X weight="bold" className="w-4 h-4" />
@@ -254,7 +259,7 @@ export const LeavesPage: React.FC = () => {
                             }
                           }}
                           aria-label="Cancel pending leave request"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 text-[11px] font-semibold transition-colors"
+                          className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 active:scale-[0.96] text-slate-600 text-[11px] font-semibold transition-transform duration-100 cursor-pointer"
                           title="Cancel Application"
                         >
                           <ArrowCounterClockwise weight="bold" className="w-3.5 h-3.5" />
@@ -351,25 +356,38 @@ export const LeavesPage: React.FC = () => {
             <textarea
               id="reasonInput"
               rows={3}
-              required
               placeholder="Explain why you are taking leave..."
               value={formData.reason}
-              onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              onChange={(e) => {
+                setFormData({ ...formData, reason: e.target.value });
+                if (formError) setFormError(null);
+              }}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
             />
           </div>
+
+          {/* Clean Inline Form Error (Banish native alert) */}
+          {formError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs flex items-center gap-2">
+              <XCircle weight="fill" className="w-4 h-4 text-rose-500 flex-shrink-0" />
+              <span className="font-medium">{formError}</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setIsApplyModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+              onClick={() => {
+                setFormError(null);
+                setIsApplyModalOpen(false);
+              }}
+              className="min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 active:scale-[0.96] transition-transform duration-100 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-semibold shadow-sm transition-all"
+              className="min-h-[40px] px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.96] text-white text-xs font-semibold shadow-sm transition-transform duration-100 cursor-pointer"
             >
               Submit Application
             </button>

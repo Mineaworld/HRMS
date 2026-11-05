@@ -130,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
                     aria-label={item.label}
                     title={isCollapsed ? item.label : undefined}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex items-center transition-all duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                    className={`flex items-center active:scale-[0.96] transition-colors duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                       isCollapsed
                         ? 'w-10 h-10 rounded-xl justify-center'
                         : 'w-full gap-3 px-3 py-2.5 rounded-xl text-xs font-medium'

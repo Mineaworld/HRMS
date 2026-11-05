@@ -5,6 +5,7 @@ import {
   MagnifyingGlass,
   Trash,
   X,
+  XCircle,
   TreeStructure,
   CheckCircle,
   CurrencyDollar,
@@ -21,6 +22,7 @@ export const EmployeesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -57,8 +59,8 @@ export const EmployeesPage: React.FC = () => {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      alert('Please fill out all required fields');
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
+      setFormError('Please fill out all required fields (First Name, Last Name, and Email).');
       return;
     }
 
@@ -73,6 +75,7 @@ export const EmployeesPage: React.FC = () => {
     });
 
     setIsAddModalOpen(false);
+    setFormError(null);
     setFormData({
       firstName: '',
       lastName: '',
@@ -231,9 +234,12 @@ export const EmployeesPage: React.FC = () => {
 
         {canCreate && (
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              setFormError(null);
+              setIsAddModalOpen(true);
+            }}
             aria-label="Open add employee dialog"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            className="flex items-center gap-2 min-h-[40px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.96] text-white text-xs font-bold shadow-sm transition-transform duration-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
           >
             <UserPlus weight="bold" className="w-4 h-4" />
             <span>Add Employee</span>
@@ -323,7 +329,7 @@ export const EmployeesPage: React.FC = () => {
                           }
                         }}
                         aria-label={`Delete employee ${emp.firstName} ${emp.lastName}`}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
+                        className="min-w-[36px] min-h-[36px] p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-[0.96] transition-transform duration-100 inline-flex items-center justify-center focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer"
                         title="Delete Employee (Admin Clearance)"
                       >
                         <Trash weight="bold" className="w-4 h-4" />
@@ -356,7 +362,10 @@ export const EmployeesPage: React.FC = () => {
                     type="text"
                     required
                     value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, firstName: e.target.value });
+                      if (formError) setFormError(null);
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
                 </div>
@@ -369,7 +378,10 @@ export const EmployeesPage: React.FC = () => {
                     type="text"
                     required
                     value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, lastName: e.target.value });
+                      if (formError) setFormError(null);
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
                 </div>
@@ -385,7 +397,10 @@ export const EmployeesPage: React.FC = () => {
                     type="email"
                     required
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      if (formError) setFormError(null);
+                    }}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
                 </div>
@@ -470,17 +485,28 @@ export const EmployeesPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Clean Inline Form Error (Banish native alert) */}
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-700 text-xs flex items-center gap-2">
+                  <XCircle weight="fill" className="w-4 h-4 text-rose-500 flex-shrink-0" />
+                  <span className="font-medium">{formError}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  onClick={() => {
+                    setFormError(null);
+                    setIsAddModalOpen(false);
+                  }}
+                  className="min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 active:scale-[0.96] transition-transform duration-100 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-colors"
+                  className="min-h-[40px] px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.96] text-white text-xs font-semibold shadow-sm transition-transform duration-100 cursor-pointer"
                 >
                   Save Employee
                 </button>

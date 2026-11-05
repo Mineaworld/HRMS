@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
-import { RightUtilityBar } from './components/layout/RightUtilityBar';
 import { DashboardPage } from './pages/DashboardPage';
 import { EmployeesPage } from './pages/EmployeesPage';
 import { AttendancePage } from './pages/AttendancePage';
@@ -160,7 +159,7 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={logout}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.96] text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 cursor-pointer"
               >
                 <SignOut weight="bold" className="w-4 h-4" />
                 <span>Sign Out</span>
@@ -170,7 +169,7 @@ export const App: React.FC = () => {
                 type="button"
                 onClick={() => syncWithGateway()}
                 disabled={isLoading}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white text-xs font-bold transition-all shadow-lg shadow-rose-950/40 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-[0.96] text-white text-xs font-bold transition-transform duration-100 shadow-lg shadow-rose-950/40 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 cursor-pointer"
               >
                 {isLoading ? (
                   <>
@@ -300,7 +299,7 @@ export const App: React.FC = () => {
               <span className="text-xs text-slate-400">Terminate current session on this device</span>
               <button
                 onClick={logout}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200 transition-colors shadow-xs focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 active:scale-[0.96] text-rose-700 text-xs font-semibold border border-rose-200 transition-colors duration-100 shadow-xs focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer"
               >
                 <SignOut weight="bold" className="w-4 h-4" />
                 <span>Sign Out of BigBoss</span>
@@ -329,9 +328,6 @@ export const App: React.FC = () => {
           {renderActivePage()}
         </main>
       </div>
-
-      {/* 3. Right Quick-Action Utility Bar */}
-      <RightUtilityBar />
     </div>
   );
 };

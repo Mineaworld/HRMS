@@ -13,7 +13,6 @@ import {
 import { useHrmsStore } from '../store/useHrmsStore';
 import { LeaveSummaryChart } from '../components/dashboard/LeaveSummaryChart';
 import { AttendanceSummaryChart } from '../components/dashboard/AttendanceSummaryChart';
-import { TimesheetSummaryChart } from '../components/dashboard/TimesheetSummaryChart';
 import { hasPermission } from '../utils/rbac';
 
 export const ReportsPage: React.FC = () => {
@@ -172,13 +171,10 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Visual Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* 3. Visual Charts Grid (Streamlined 2-Column Layout) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="min-h-[290px]">
           <LeaveSummaryChart />
-        </div>
-        <div className="min-h-[290px]">
-          <TimesheetSummaryChart />
         </div>
         <div className="min-h-[290px]">
           <AttendanceSummaryChart />
