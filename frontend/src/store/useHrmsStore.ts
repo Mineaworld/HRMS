@@ -91,7 +91,7 @@ interface HrmsState {
 export const useHrmsStore = create<HrmsState>((set, get) => {
   const initial = getStoredData();
   const storedAuth = typeof window !== 'undefined' ? localStorage.getItem('hrms_authenticated') : null;
-  const isAuthenticated = storedAuth === null ? true : storedAuth === 'true';
+  const isAuthenticated = storedAuth === 'true';
 
   return {
     isAuthenticated,

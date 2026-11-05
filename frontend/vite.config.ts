@@ -13,6 +13,13 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    proxy: {
+      '/mailpit': {
+        target: 'http://localhost:8025',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/mailpit/, ''),
+      },
+    },
   },
   build: {
     rollupOptions: {

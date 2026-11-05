@@ -196,7 +196,14 @@ export const authApi = {
    */
   fetchLatestMailpitOtp: async (emailOrUsername?: string): Promise<string | null> => {
     try {
-      const res = await axios.get(`${MAILPIT_API_URL}/api/v1/messages`);
+      let res;
+      try {
+        res = await axios.get(`${MAILPIT_API_URL}/api/v1/messages`);
+      } catch (directErr) {
+        // Fallback to Vite dev server proxy if direct browser CORS is blocked
+        res = await axios.get('/mailpit/api/v1/messages');
+      }
+
       const messages: any[] = res.data?.messages || [];
       if (!messages.length) return null;
 

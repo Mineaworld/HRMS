@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Buildings,
   User,
@@ -12,38 +12,46 @@ import {
   Key,
   ArrowLeft,
   ArrowRight,
+  EnvelopeOpen,
   Sparkle,
+  ArrowsClockwise,
+  ShieldWarning,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { UserRole, UserAccount } from '../types';
 import { ROLE_PERSONAS, getRoleBadge } from '../utils/rbac';
-import { authApi } from '../api';
+import { authApi, TokenResponse } from '../api';
+import { Modal } from '../components/ui/modal';
 
 interface PresetAccount {
   userName: string;
   role: UserRole;
   passwordHint: string;
   badgeLabel: string;
+  displayName: string;
 }
 
 const PRESET_ACCOUNTS: PresetAccount[] = [
   {
-    userName: 'prasenjit.mondal',
+    userName: 'sysadmin',
     role: 'ROLE_ADMIN',
-    passwordHint: 'Admin@1234',
+    passwordHint: 'Ahsva@087',
     badgeLabel: 'ADMIN',
+    displayName: 'System Administrator',
   },
   {
     userName: 'sarah.jenkins',
     role: 'ROLE_HR',
     passwordHint: 'Hr@1234',
     badgeLabel: 'HR MANAGER',
+    displayName: 'Sarah Jenkins',
   },
   {
     userName: 'sophea.chan',
     role: 'ROLE_EMPLOYEE',
     passwordHint: 'Staff@1234',
     badgeLabel: 'STAFF MEMBER',
+    displayName: 'Sophea Chan',
   },
 ];
 
@@ -51,14 +59,25 @@ export const LoginPage: React.FC = () => {
   const { login } = useHrmsStore();
 
   const [mode, setMode] = useState<'login' | 'otp' | 'reset'>('login');
-  const [userName, setUserName] = useState('prasenjit.mondal');
-  const [password, setPassword] = useState('Admin@1234');
+  const [userName, setUserName] = useState('sysadmin');
+  const [password, setPassword] = useState('Ahsva@087');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
   // OTP State
   const [otpCode, setOtpCode] = useState('');
-  const [detectedOtp, setDetectedOtp] = useState<string | null>(null);
+  const [isFetchingMailpit, setIsFetchingMailpit] = useState(false);
+
+  // First-Login Interception Modal State
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
+  const [tempAuthResponse, setTempAuthResponse] = useState<TokenResponse | null>(null);
+  const [firstLoginCurrentPassword, setFirstLoginCurrentPassword] = useState('');
+  const [firstLoginNewPassword, setFirstLoginNewPassword] = useState('');
+  const [firstLoginConfirmPassword, setFirstLoginConfirmPassword] = useState('');
+  const [showModalOldPassword, setShowModalOldPassword] = useState(false);
+  const [showModalNewPassword, setShowModalNewPassword] = useState(false);
+  const [firstLoginError, setFirstLoginError] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Reset Password State
   const [newPassword, setNewPassword] = useState('');
@@ -68,6 +87,17 @@ export const LoginPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Auto-fetch OTP from Mailpit upon entering OTP mode
+  useEffect(() => {
+    let timer: any;
+    if (mode === 'otp') {
+      timer = setTimeout(() => {
+        handleFetchMailpitOtp();
+      }, 700);
+    }
+    return () => clearTimeout(timer);
+  }, [mode]);
+
   const handlePresetSelect = (preset: PresetAccount, autoSubmit = false) => {
     setUserName(preset.userName);
     setPassword(preset.passwordHint);
@@ -75,27 +105,67 @@ export const LoginPage: React.FC = () => {
     setStatusMessage(null);
 
     if (autoSubmit) {
-      performLogin(preset.userName, preset.passwordHint, preset.role);
+      performLogin(preset.userName, preset.passwordHint);
     }
   };
 
-  const resolveUserByRoleOrUsername = (uName: string): UserAccount => {
-    const matchedPreset = PRESET_ACCOUNTS.find((p) => p.userName === uName);
-    const role: UserRole = matchedPreset?.role || (uName.includes('admin') ? 'ROLE_ADMIN' : uName.includes('hr') ? 'ROLE_HR' : 'ROLE_EMPLOYEE');
+  const normalizeRole = (r?: string): UserRole => {
+    if (!r) return 'ROLE_EMPLOYEE';
+    const upper = r.toUpperCase();
+    if (upper.includes('ADMIN')) return 'ROLE_ADMIN';
+    if (upper.includes('HR')) return 'ROLE_HR';
+    return 'ROLE_EMPLOYEE';
+  };
+
+  const resolveUserByRoleOrUsername = (
+    uName: string,
+    roleFromApi?: string,
+    emailFromApi?: string,
+    accountIdFromApi?: number,
+    employeeIdFromApi?: number | null
+  ): UserAccount => {
+    const matchedPreset = PRESET_ACCOUNTS.find(
+      (p) => p.userName.toLowerCase() === uName.toLowerCase()
+    );
+    const role: UserRole = normalizeRole(
+      roleFromApi ||
+        matchedPreset?.role ||
+        (uName.toLowerCase().includes('admin')
+          ? 'ROLE_ADMIN'
+          : uName.toLowerCase().includes('hr')
+          ? 'ROLE_HR'
+          : 'ROLE_EMPLOYEE')
+    );
     const persona = ROLE_PERSONAS[role];
 
     return {
-      accountId: role === 'ROLE_ADMIN' ? 101 : role === 'ROLE_HR' ? 102 : 103,
+      accountId:
+        accountIdFromApi ??
+        (role === 'ROLE_ADMIN' ? 4 : role === 'ROLE_HR' ? 102 : 103),
       userName: uName,
-      fullName: persona.fullName,
-      email: persona.email,
+      fullName:
+        uName === 'sysadmin'
+          ? 'System Administrator'
+          : matchedPreset?.displayName || persona?.fullName || uName,
+      email:
+        emailFromApi ||
+        (uName === 'sysadmin'
+          ? 'sysadmin@hrms.local'
+          : persona?.email || `${uName}@hrms.local`),
       role,
-      employeeId: persona.employeeId,
-      avatarUrl: persona.avatarUrl,
+      employeeId:
+        employeeIdFromApi !== null && employeeIdFromApi !== undefined
+          ? employeeIdFromApi
+          : uName === 'sysadmin'
+          ? undefined
+          : persona?.employeeId,
+      avatarUrl:
+        persona?.avatarUrl ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
     };
   };
 
-  const performLogin = async (usr: string, pwd: string, fallbackRole?: UserRole) => {
+  const performLogin = async (usr: string, pwd: string) => {
     if (!usr.trim() || !pwd.trim()) {
       setErrorMessage('Please enter both your username and password.');
       return;
@@ -106,62 +176,64 @@ export const LoginPage: React.FC = () => {
     setStatusMessage(null);
 
     try {
-      // 1. Attempt call to auth_service microservice via API Gateway (:8080/api/auth/login)
-      const res = await authApi.login({ userName: usr, password: pwd });
+      const res = await authApi.login({ userName: usr.trim(), password: pwd });
 
       if (res && res.success) {
-        // Check if first-login OTP is triggered by AuthServiceImpl
-        if (typeof res.message === 'string' && res.message.includes('OTP')) {
-          // Extract OTP if printed in development response: "New OTP generated. OTP = 123456"
-          const match = res.message.match(/OTP\s*=\s*(\d+)/i);
-          if (match && match[1]) {
-            setDetectedOtp(match[1]);
-          }
-          setStatusMessage(res.message);
-          setMode('otp');
-          setIsLoading(false);
+        if (res.token) {
+          const user = resolveUserByRoleOrUsername(
+            usr.trim(),
+            res.role,
+            res.email,
+            res.accountId,
+            res.employeeId
+          );
+          login(user, res.token);
           return;
         }
 
-        // Standard Login Successful
-        const user = resolveUserByRoleOrUsername(usr);
-        if (fallbackRole) {
-          user.role = fallbackRole;
-        }
-        login(user, res.token || 'jwt-bearer-auth-service-token');
-        return;
+        setStatusMessage(
+          res.message || 'A 6-digit verification code has been dispatched to your email.'
+        );
+        setMode('otp');
+        setOtpCode('');
       } else {
         setErrorMessage(res?.message || 'Invalid username or password.');
       }
     } catch (err: any) {
-      // 2. Fallback to resilient client mock simulation if microservice is offline or in prototype demo
-      console.info('Live auth microservice offline on :8080. Authenticating in enterprise prototype mode.', err);
-
-      // Validate mock credentials
-      const matched = PRESET_ACCOUNTS.find((p) => p.userName.toLowerCase() === usr.toLowerCase());
-      if (!matched && !usr.includes('.')) {
-        setErrorMessage('Username does not exist. Use a preset persona or format (e.g. name.surname).');
-        setIsLoading(false);
-        return;
-      }
-
-      // Successful simulated login
-      const user = resolveUserByRoleOrUsername(usr);
-      if (fallbackRole) {
-        user.role = fallbackRole;
-      }
-      setTimeout(() => {
-        login(user, 'mock-jwt-token-gateway-8080');
-      }, 400);
+      const msg =
+        err.response?.data?.message ||
+        (err.code === 'ERR_NETWORK'
+          ? 'Cannot reach API Gateway (:8080). Please ensure backend services are running.'
+          : err.message || 'Invalid username or password.');
+      setErrorMessage(msg);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleFetchMailpitOtp = async () => {
+    setIsFetchingMailpit(true);
+    try {
+      const code = await authApi.fetchLatestMailpitOtp(userName);
+      if (code) {
+        setOtpCode(code);
+        setStatusMessage(`Auto-filled OTP [${code}] from Mailpit test inbox (:8025)`);
+      } else {
+        setErrorMessage(
+          `No recent OTP found in Mailpit inbox for @${userName}. You can view incoming emails at http://localhost:8025`
+        );
+      }
+    } catch {
+      setErrorMessage('Could not connect to Mailpit at http://localhost:8025.');
+    } finally {
+      setIsFetchingMailpit(false);
+    }
+  };
+
   const handleOtpVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otpCode.trim() || otpCode.trim().length < 4) {
-      setErrorMessage('Please enter the verification code.');
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setErrorMessage('Please enter the 6-digit verification code.');
       return;
     }
 
@@ -169,19 +241,132 @@ export const LoginPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const res = await authApi.verifyOtp({ userName, otpCode: otpCode.trim() });
-      if (res && res.success) {
-        const user = resolveUserByRoleOrUsername(userName);
-        login(user, 'jwt-bearer-otp-verified-token');
-      } else {
+      const res = await authApi.verifyOtp({
+        userName: userName.trim(),
+        otpCode: otpCode.trim(),
+      });
+
+      if (!res || !res.success) {
         setErrorMessage(res?.message || 'Invalid or expired OTP code.');
+        setIsLoading(false);
+        return;
       }
+
+      // First-Login Interception Modal
+      if (res.isFirstLogin) {
+        setTempAuthResponse(res);
+        if (typeof window !== 'undefined' && res.token) {
+          localStorage.setItem('hrms_jwt_token', res.token);
+        }
+        setFirstLoginCurrentPassword(password);
+        setFirstLoginNewPassword('');
+        setFirstLoginConfirmPassword('');
+        setFirstLoginError(null);
+        setShowFirstLoginModal(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Normal login success
+      const user = resolveUserByRoleOrUsername(
+        res.userName,
+        res.role,
+        res.email,
+        res.accountId,
+        res.employeeId
+      );
+      login(user, res.token);
     } catch (err: any) {
-      // Fallback for prototype mode
-      const user = resolveUserByRoleOrUsername(userName);
-      login(user, 'mock-jwt-otp-verified-token');
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        'OTP verification failed. Please try again.';
+      setErrorMessage(msg);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+    try {
+      const res = await authApi.login({ userName: userName.trim(), password });
+      if (res && res.success) {
+        setStatusMessage(res.message || 'A fresh OTP has been sent to your inbox.');
+        setTimeout(() => handleFetchMailpitOtp(), 800);
+      } else {
+        setErrorMessage(res?.message || 'Failed to resend verification code.');
+      }
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to resend verification code.';
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFirstLoginPasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFirstLoginError(null);
+
+    if (!firstLoginCurrentPassword) {
+      setFirstLoginError('Please enter your current temporary password.');
+      return;
+    }
+    if (!firstLoginNewPassword || firstLoginNewPassword.length < 8) {
+      setFirstLoginError('New password must be at least 8 characters long.');
+      return;
+    }
+    if (firstLoginNewPassword === firstLoginCurrentPassword) {
+      setFirstLoginError('New password must be different from current password.');
+      return;
+    }
+    if (
+      firstLoginConfirmPassword &&
+      firstLoginNewPassword !== firstLoginConfirmPassword
+    ) {
+      setFirstLoginError('Password confirmation does not match.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      if (tempAuthResponse?.token && typeof window !== 'undefined') {
+        localStorage.setItem('hrms_jwt_token', tempAuthResponse.token);
+      }
+
+      const res = await authApi.changePassword({
+        oldPassword: firstLoginCurrentPassword,
+        newPassword: firstLoginNewPassword,
+      });
+
+      if (res && res.success) {
+        setShowFirstLoginModal(false);
+        const user = resolveUserByRoleOrUsername(
+          res.userName || tempAuthResponse?.userName || userName,
+          res.role || tempAuthResponse?.role,
+          res.email || tempAuthResponse?.email,
+          res.accountId || tempAuthResponse?.accountId,
+          res.employeeId ?? tempAuthResponse?.employeeId
+        );
+        login(user, res.token);
+      } else {
+        setFirstLoginError(res?.message || 'Failed to update initial password.');
+      }
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to change initial password. Please verify current password and try again.';
+      setFirstLoginError(msg);
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -196,18 +381,27 @@ export const LoginPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const res = await authApi.resetPassword({ userName, newPassword });
+      const res = await authApi.resetPassword({
+        userName: userName.trim(),
+        newPassword,
+      });
       if (res && res.success) {
-        setStatusMessage('Password reset successfully! Please sign in with your new password.');
+        setStatusMessage(
+          'Password reset successfully! Please sign in with your new password.'
+        );
         setPassword(newPassword);
         setMode('login');
       } else {
-        setErrorMessage(res?.message || 'Could not reset password for this account.');
+        setErrorMessage(
+          res?.message || 'Could not reset password for this account.'
+        );
       }
-    } catch (err) {
-      setStatusMessage('Password reset simulated for prototype. Please sign in now.');
-      setPassword(newPassword);
-      setMode('login');
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        'Could not reset password for this account.';
+      setErrorMessage(msg);
     } finally {
       setIsLoading(false);
     }
@@ -226,7 +420,9 @@ export const LoginPage: React.FC = () => {
             <Buildings weight="duotone" className="w-7 h-7 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">BigBoss</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              BigBoss
+            </h1>
             <p className="text-xs font-medium text-slate-500 uppercase tracking-widest mt-0.5">
               Workforce Operations Cloud
             </p>
@@ -238,15 +434,25 @@ export const LoginPage: React.FC = () => {
           {/* Status / Alert Banner */}
           {errorMessage && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fadeIn">
-              <WarningCircle weight="fill" className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
+              <WarningCircle
+                weight="fill"
+                className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5"
+              />
+              <div className="flex-1 font-medium leading-relaxed">
+                {errorMessage}
+              </div>
             </div>
           )}
 
           {statusMessage && (
             <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200/80 text-xs text-blue-700 flex items-start gap-2.5 animate-fadeIn">
-              <CheckCircle weight="fill" className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 font-medium leading-relaxed">{statusMessage}</div>
+              <CheckCircle
+                weight="fill"
+                className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5"
+              />
+              <div className="flex-1 font-medium leading-relaxed">
+                {statusMessage}
+              </div>
             </div>
           )}
 
@@ -271,7 +477,7 @@ export const LoginPage: React.FC = () => {
                     type="text"
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
-                    placeholder="e.g. prasenjit.mondal"
+                    placeholder="e.g. sysadmin"
                     required
                     className="w-full pl-10 pr-3.5 py-2.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-400"
                   />
@@ -280,7 +486,9 @@ export const LoginPage: React.FC = () => {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-700">Password</label>
+                  <label className="text-xs font-semibold text-slate-700">
+                    Password
+                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -329,7 +537,9 @@ export const LoginPage: React.FC = () => {
                   />
                   <span>Remember this browser</span>
                 </label>
-                <span className="text-[11px] text-slate-400 font-mono">Gateway :8080</span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  Gateway :8080
+                </span>
               </div>
 
               <button
@@ -352,36 +562,59 @@ export const LoginPage: React.FC = () => {
             </form>
           )}
 
-          {/* MODE 2: TWO-FACTOR / FIRST-LOGIN OTP */}
+          {/* MODE 2: TWO-FACTOR / 1-CLICK MAILPIT OTP */}
           {mode === 'otp' && (
             <form onSubmit={handleOtpVerify} className="space-y-4">
               <div className="text-center space-y-1">
                 <div className="inline-flex p-3 rounded-full bg-blue-50 text-blue-600 mb-1">
                   <ShieldCheck weight="duotone" className="w-8 h-8" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Two-Factor Authentication</h3>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Two-Factor Authentication
+                </h3>
                 <p className="text-xs text-slate-500">
-                  Enter the verification code generated for{' '}
-                  <span className="font-mono font-semibold text-slate-800">@{userName}</span>
+                  Enter the 6-digit verification code sent for{' '}
+                  <span className="font-mono font-semibold text-slate-800">
+                    @{userName}
+                  </span>
                 </p>
               </div>
 
-              {detectedOtp && (
-                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/80 text-xs text-amber-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkle weight="duotone" className="w-4 h-4 text-amber-600" />
-                    <span>Server OTP code:</span>
-                    <strong className="font-mono text-slate-900 text-sm">{detectedOtp}</strong>
+              {/* 1-Click Mailpit OTP Auto-Fill Badge / Button */}
+              <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/80 border border-blue-200/80 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-xs">
+                    <Sparkle weight="fill" className="w-3.5 h-3.5" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setOtpCode(detectedOtp)}
-                    className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 underline"
-                  >
-                    Auto-Fill
-                  </button>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-slate-800 truncate">
+                      Mailpit Test Inbox (:8025)
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Development OTP Capture
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                <button
+                  type="button"
+                  onClick={handleFetchMailpitOtp}
+                  disabled={isFetchingMailpit}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-[11px] font-semibold text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 active:scale-[0.98] transition-all shadow-xs disabled:opacity-60 flex-shrink-0"
+                >
+                  {isFetchingMailpit ? (
+                    <>
+                      <CircleNotch weight="bold" className="w-3.5 h-3.5 animate-spin" />
+                      <span>Fetching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <EnvelopeOpen weight="bold" className="w-3.5 h-3.5" />
+                      <span>Auto-fill OTP (:8025)</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5 text-center">
@@ -392,10 +625,10 @@ export const LoginPage: React.FC = () => {
                   maxLength={6}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
+                  placeholder="••••••"
                   autoFocus
                   required
-                  className="w-full text-center tracking-[0.5em] text-lg font-mono py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 font-bold"
+                  className="w-full text-center tracking-[0.6em] text-xl font-mono py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 font-bold placeholder:tracking-normal placeholder:font-sans placeholder:text-slate-300"
                 />
               </div>
 
@@ -418,17 +651,29 @@ export const LoginPage: React.FC = () => {
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('login');
-                    setErrorMessage(null);
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
-                >
-                  <ArrowLeft weight="bold" className="w-3.5 h-3.5" />
-                  <span>Back to Sign In</span>
-                </button>
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('login');
+                      setErrorMessage(null);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <ArrowLeft weight="bold" className="w-3.5 h-3.5" />
+                    <span>Back to Sign In</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={isLoading}
+                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    <ArrowsClockwise weight="bold" className="w-3.5 h-3.5" />
+                    <span>Resend Code</span>
+                  </button>
+                </div>
               </div>
             </form>
           )}
@@ -440,7 +685,9 @@ export const LoginPage: React.FC = () => {
                 <div className="inline-flex p-3 rounded-full bg-slate-100 text-slate-800 mb-1">
                   <Key weight="duotone" className="w-7 h-7" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Reset Account Password</h3>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Reset Account Password
+                </h3>
                 <p className="text-xs text-slate-500">
                   Update your security credentials via the auth microservice
                 </p>
@@ -454,7 +701,7 @@ export const LoginPage: React.FC = () => {
                   type="text"
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  placeholder="e.g. prasenjit.mondal"
+                  placeholder="e.g. sysadmin"
                   required
                   className="w-full px-3.5 py-2.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
@@ -470,6 +717,7 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new strong password"
                   required
+                  minLength={8}
                   className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
               </div>
@@ -511,7 +759,9 @@ export const LoginPage: React.FC = () => {
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 1-Click Demo Personas
               </span>
-              <span className="text-[10px] text-blue-600 font-mono font-medium">RBAC Preset</span>
+              <span className="text-[10px] text-blue-600 font-mono font-medium">
+                Live Gateway & DB
+              </span>
             </div>
 
             <div className="space-y-2">
@@ -533,12 +783,12 @@ export const LoginPage: React.FC = () => {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={persona.avatarUrl}
-                        alt={persona.fullName}
+                        alt={preset.displayName}
                         className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 flex-shrink-0"
                       />
                       <div className="min-w-0 text-left">
                         <div className="text-xs font-semibold text-slate-900 truncate">
-                          {persona.fullName}
+                          {preset.displayName}
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono truncate">
                           {preset.userName}
@@ -572,12 +822,166 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Security & Microservices Architecture Note */}
+        {/* Security & Architecture Note */}
         <div className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-2">
           <ShieldCheck weight="bold" className="w-4 h-4 text-emerald-600" />
           <span>Spring Security • JWT Claims • Spring Cloud Gateway (:8080)</span>
         </div>
       </div>
+
+      {/* First-Login Interception Modal */}
+      <Modal
+        isOpen={showFirstLoginModal}
+        onClose={() => {
+          setShowFirstLoginModal(false);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('hrms_jwt_token');
+          }
+        }}
+        title="Change Initial Password"
+        subtitle="Gateway Security Policy • First-Login Requirement"
+        maxWidth="md"
+      >
+        <form onSubmit={handleFirstLoginPasswordChange} className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-2.5">
+            <ShieldWarning
+              weight="fill"
+              className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"
+            />
+            <div className="leading-relaxed">
+              <strong>Initial Password Change Required:</strong> The API
+              Gateway requires an initial password change before access to
+              workforce resources can be granted. Please establish your new
+              permanent password.
+            </div>
+          </div>
+
+          {firstLoginError && (
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fadeIn">
+              <WarningCircle
+                weight="fill"
+                className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5"
+              />
+              <div className="flex-1 font-medium leading-relaxed">
+                {firstLoginError}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Current Temporary Password
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Lock weight="duotone" className="w-4 h-4" />
+              </span>
+              <input
+                type={showModalOldPassword ? 'text' : 'password'}
+                value={firstLoginCurrentPassword}
+                onChange={(e) => setFirstLoginCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                required
+                className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowModalOldPassword(!showModalOldPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+              >
+                {showModalOldPassword ? (
+                  <EyeSlash weight="regular" className="w-4 h-4" />
+                ) : (
+                  <Eye weight="regular" className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              New Permanent Password (min. 8 characters)
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Key weight="duotone" className="w-4 h-4" />
+              </span>
+              <input
+                type={showModalNewPassword ? 'text' : 'password'}
+                value={firstLoginNewPassword}
+                onChange={(e) => setFirstLoginNewPassword(e.target.value)}
+                placeholder="Enter new strong password"
+                required
+                minLength={8}
+                className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowModalNewPassword(!showModalNewPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+              >
+                {showModalNewPassword ? (
+                  <EyeSlash weight="regular" className="w-4 h-4" />
+                ) : (
+                  <Eye weight="regular" className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Confirm New Password
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Key weight="duotone" className="w-4 h-4" />
+              </span>
+              <input
+                type={showModalNewPassword ? 'text' : 'password'}
+                value={firstLoginConfirmPassword}
+                onChange={(e) => setFirstLoginConfirmPassword(e.target.value)}
+                placeholder="Re-enter new password"
+                required
+                minLength={8}
+                className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setShowFirstLoginModal(false);
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('hrms_jwt_token');
+                }
+              }}
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isChangingPassword}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all disabled:opacity-70"
+            >
+              {isChangingPassword ? (
+                <>
+                  <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
+                  <span>Updating Password...</span>
+                </>
+              ) : (
+                <>
+                  <span>Change Password & Enter HRMS</span>
+                  <ArrowRight weight="bold" className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
