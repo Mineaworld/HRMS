@@ -59,7 +59,7 @@ public class PayrollController {
 
 
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HR_MANAGER', 'HR_STAFF', 'EMPLOYEE')")
     public ResponseEntity<List<PayrollRecordResponse>> getMyPayrolls() {
         return ResponseEntity.ok(payrollService.getMyPayrolls(currentEmployeeId()));
     }

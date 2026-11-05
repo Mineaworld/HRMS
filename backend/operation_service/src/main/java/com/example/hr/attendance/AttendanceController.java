@@ -36,35 +36,35 @@ public class AttendanceController {
     }
 
     @PostMapping("/check-in")
-    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','HR_STAFF','EMPLOYEE')")
     public ResponseEntity<AttendanceResponse> checkIn() {
         AttendanceResponse response = attendanceService.checkIn(currentEmployeeId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/check-out")
-    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','HR_STAFF','EMPLOYEE')")
     public ResponseEntity<AttendanceResponse> checkOut() {
         AttendanceResponse response = attendanceService.checkOut(currentEmployeeId());
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','HR_STAFF')")
     public ResponseEntity<List<AttendanceResponse>> getAttendance(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(attendanceService.getAttendanceByDate(date));
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','HR_STAFF','EMPLOYEE')")
     public ResponseEntity<AttendanceResponse> getMyAttendance(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(attendanceService.getEmployeeAttendance(currentEmployeeId(), date));
     }
 
     @GetMapping("/{attendanceId}")
-    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','HR_STAFF')")
     public ResponseEntity<AttendanceResponse> getAttendanceRecord(@PathVariable Integer attendanceId) {
         return ResponseEntity.ok(attendanceService.getAttendanceRecord(attendanceId));
     }

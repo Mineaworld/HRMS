@@ -37,7 +37,7 @@ public class AttendanceCorrectionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','HR_STAFF')")
     public ResponseEntity<AttendanceResponse> correctAttendance(
             @PathVariable Integer attendanceId,
             @Valid @RequestBody CorrectionRequest request) {
@@ -55,7 +55,7 @@ public class AttendanceCorrectionController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','HR_MANAGER','HR_STAFF')")
     public ResponseEntity<List<CorrectionResponse>> getCorrectionHistory(
             @PathVariable Integer attendanceId) {
         return ResponseEntity.ok(attendanceService.getCorrectionHistory(attendanceId));
