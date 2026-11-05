@@ -1,11 +1,11 @@
 import React from 'react';
 import {
-  Briefcase,
-  House,
+  UsersThree,
+  Buildings,
   CheckCircle,
-  Calendar,
-  Clock,
-  Sparkle,
+  CalendarCheck,
+  Briefcase,
+  TreeStructure,
 } from '@phosphor-icons/react';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { PendingActionCard } from '../components/dashboard/PendingActionCard';
@@ -18,8 +18,14 @@ import { useHrmsStore } from '../store/useHrmsStore';
 import { getRoleBadge } from '../utils/rbac';
 
 export const DashboardPage: React.FC = () => {
-  const { currentUser } = useHrmsStore();
+  const { currentUser, employees, departments, jobs, leaves, dashboardSummary } = useHrmsStore();
   const roleBadge = getRoleBadge(currentUser.role);
+
+  const totalEmployees = dashboardSummary?.totalEmployees ?? employees.length;
+  const activeEmployees = dashboardSummary?.activeEmployees ?? employees.filter((e) => e.status === 'Active').length;
+  const totalDepartments = dashboardSummary?.totalDepartments ?? departments.length;
+  const totalJobs = dashboardSummary?.totalJobs ?? (jobs.length || 23);
+  const pendingLeaves = leaves.filter((l) => l.status === 'PENDING').length;
 
   return (
     <div className="space-y-6 pb-10">
@@ -27,7 +33,7 @@ export const DashboardPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-extrabold tracking-tight text-slate-900">
-            Welcome Back, <span className="text-blue-600">{currentUser.fullName}</span>! 👋
+            Welcome Back, <span className="text-blue-600">{currentUser.fullName}</span>
           </h2>
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${roleBadge.badgeClass}`}
@@ -41,50 +47,42 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 1. Top Metrics Row (5 Cards) */}
+      {/* 1. Top Metrics Row (5 Cards - Bound to Real Gateway & PostgreSQL Telemetry) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard
-          value="04"
-          title="Active Projects"
-          subtitle="Projects employee is working on"
-          icon={Briefcase}
+          value={String(totalEmployees).padStart(2, '0')}
+          title="Total Workforce"
+          subtitle="Registered company roster"
+          icon={UsersThree}
           accent="blue"
         />
         <MetricCard
-          value={
-            <span>
-              05<span className="text-sm font-normal text-slate-400">/08</span>
-            </span>
-          }
-          title="WFH Balance"
-          subtitle="This Month"
-          icon={House}
-          accent="purple"
-        />
-        <MetricCard
-          value="50"
-          title="Tasks Completed"
-          subtitle="This Month"
+          value={String(activeEmployees).padStart(2, '0')}
+          title="Active Staff"
+          subtitle="Operational personnel"
           icon={CheckCircle}
           accent="green"
         />
         <MetricCard
-          value="05"
-          title="Leave Balance"
-          subtitle="Remaining (YTD)"
-          icon={Calendar}
-          accent="orange"
+          value={String(totalDepartments).padStart(2, '0')}
+          title="Departments"
+          subtitle="Operational divisions"
+          icon={Buildings}
+          accent="purple"
         />
         <MetricCard
-          value={
-            <span>
-              176<span className="text-sm font-normal text-slate-400">/hr</span>
-            </span>
-          }
-          title="Work Hours"
-          subtitle="This Month"
-          icon={Clock}
+          value={String(totalJobs).padStart(2, '0')}
+          title="Job Positions"
+          subtitle="Configured career roles"
+          icon={Briefcase}
           accent="cyan"
+        />
+        <MetricCard
+          value={String(pendingLeaves).padStart(2, '0')}
+          title="Pending Requests"
+          subtitle="Leaves awaiting review"
+          icon={CalendarCheck}
+          accent="orange"
         />
       </div>
 

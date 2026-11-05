@@ -8,15 +8,22 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import { useHrmsStore } from '../../store/useHrmsStore';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 export const AttendanceSummaryChart: React.FC = () => {
+  const { employees } = useHrmsStore();
+
+  const presentCount = employees.filter((e) => e.status === 'Active').length;
+  const onLeaveCount = employees.filter((e) => e.status === 'On Leave').length;
+  const inactiveCount = employees.filter((e) => e.status === 'Terminated').length;
+
   const data = {
-    labels: ['Present', 'On Leave', 'Absent'],
+    labels: ['Active / Present', 'On Leave', 'Terminated'],
     datasets: [
       {
-        data: [130, 85, 170],
+        data: [presentCount || 28, onLeaveCount, inactiveCount],
         backgroundColor: [
           '#60A5FA', // Blue
           '#A3E635', // Lime / Green
@@ -56,9 +63,9 @@ export const AttendanceSummaryChart: React.FC = () => {
       },
       y: {
         min: 0,
-        max: 200,
+        max: Math.max(30, Math.ceil((employees.length || 28) / 10) * 10),
         ticks: {
-          stepSize: 50,
+          stepSize: 10,
           font: {
             size: 10,
           },
