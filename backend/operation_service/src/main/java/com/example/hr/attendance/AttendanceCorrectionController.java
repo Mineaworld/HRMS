@@ -24,16 +24,12 @@ public class AttendanceCorrectionController {
         this.attendanceService = attendanceService;
     }
 
-    private Integer currentEmployeeId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
-            String employeeIdStr = jwt.getClaimAsString("employeeId");
-            if (employeeIdStr != null) {
-                return Integer.parseInt(employeeIdStr);
-            }
-            return Integer.parseInt(jwt.getSubject());
-        }
-        throw new IllegalStateException("User not authenticated or employeeId missing");
+    /** From the token's employeeId claim; never the account id (see CurrentEmployee). */
+
+    private static Integer currentEmployeeId() {
+
+        return com.example.hr.common.security.CurrentEmployee.id();
+
     }
 
     @PostMapping

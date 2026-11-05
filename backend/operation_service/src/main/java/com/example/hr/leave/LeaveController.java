@@ -21,9 +21,12 @@ public class LeaveController {
         this.leaveService = leaveService;
     }
 
-    private Integer currentEmployeeId() {
-        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return Integer.valueOf(jwt.getClaimAsString("employeeId"));
+    /** From the token's employeeId claim; never the account id (see CurrentEmployee). */
+
+    private static Integer currentEmployeeId() {
+
+        return com.example.hr.common.security.CurrentEmployee.id();
+
     }
 
     @PostMapping

@@ -62,20 +62,9 @@ public class EmployeeController {
     public List<JobHistoryResponse> getJobHistory(@PathVariable Integer employeeId) {
         return employeeService.jobHistory(employeeId);
     }
-
-    /**
-     * The employeeId claim of the caller's token, or null (no employee linked). Unlike older /me endpoints,
-     * this never falls back to the account id, which is a different number.
-     */
+    /** From the token's employeeId claim; never the account id (see CurrentEmployee). */
     private static Integer currentEmployeeId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
-            String employeeId = jwt.getClaimAsString("employeeId");
-            if (employeeId != null && employeeId.matches("\\d+")) {
-                return Integer.valueOf(employeeId);
-            }
-        }
-        return null;
+        return com.example.hr.common.security.CurrentEmployee.idOrNull();
     }
 
     @PatchMapping("/{employeeId}")
