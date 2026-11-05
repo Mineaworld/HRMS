@@ -182,7 +182,10 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     },
 
     // Navigation & Roles
-    activeTab: 'dashboard',
+    activeTab:
+      typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab')
+        ? (new URLSearchParams(window.location.search).get('tab') as NavTab)
+        : 'dashboard',
     setActiveTab: (tab) => set({ activeTab: tab }),
     currentUser: initialUser,
 

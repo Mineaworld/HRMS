@@ -60,6 +60,10 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
         return 'Timesheet Summary';
       case 'employees':
         return 'Employee Directory';
+      case 'departments':
+        return 'Organization & Departments';
+      case 'automations':
+        return 'System Automations';
       case 'leaves':
         return 'Leave Applications';
       case 'payroll':
@@ -83,6 +87,10 @@ export const Header: React.FC<HeaderProps> = ({ onRaiseRequestClick }) => {
         return 'Weekly hours verification and timesheet statuses';
       case 'employees':
         return 'Staff profiles, departmental assignments, and contact data';
+      case 'departments':
+        return 'Organization hierarchy, headcounts, and departmental budgets';
+      case 'automations':
+        return 'Background jobs, automated reconciliations, and execution history';
       case 'leaves':
         return 'Time off requests, allowances balance, and approvals';
       case 'payroll':
