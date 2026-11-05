@@ -269,6 +269,16 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           reportApi.getDashboard(),
         ]);
 
+        // If session token is expired or unauthorized, reset session to prompt fresh login
+        const isUnauthorized = (res: PromiseSettledResult<any>) =>
+          res.status === 'rejected' && res.reason?.response?.status === 401;
+
+        if (isUnauthorized(empResult) || isUnauthorized(deptResult)) {
+          console.warn('Session token expired or unauthorized. Redirecting to login screen.');
+          get().logout();
+          return;
+        }
+
         // Evaluate connection failure / network errors
         const isNetworkFailure = (res: PromiseSettledResult<any>) =>
           res.status === 'rejected' &&

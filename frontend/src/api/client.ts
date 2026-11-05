@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-export const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_GATEWAY_URL) || 'http://localhost:8080';
+export const API_BASE_URL =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_GATEWAY_URL) ??
+  (typeof window !== 'undefined' ? '' : 'http://localhost:8080');
 export const MAILPIT_API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MAILPIT_URL) || 'http://localhost:8025';
 export const IS_MOCK_MODE = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true';
 
@@ -12,31 +14,13 @@ export const apiClient = axios.create({
   timeout: 10000,
 });
 
-// Automatic JWT & RBAC Gateway Interceptor
+// Automatic JWT Gateway Interceptor
 apiClient.interceptors.request.use(
   (config) => {
     // Attach Bearer token only when token exists
     const token = typeof localStorage !== 'undefined' ? localStorage.getItem('hrms_jwt_token') : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    // Read stored user to inject Gateway RBAC headers if available
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const storedUser = localStorage.getItem('hrms_user');
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          if (user.role) {
-            config.headers['X-User-Role'] = user.role;
-          }
-          if (user.employeeId) {
-            config.headers['X-Employee-Id'] = String(user.employeeId);
-          }
-        }
-      }
-    } catch {
-      // Ignore JSON parse error
     }
 
     return config;

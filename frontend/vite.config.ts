@@ -14,6 +14,10 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
       '/mailpit': {
         target: 'http://localhost:8025',
         changeOrigin: true,
