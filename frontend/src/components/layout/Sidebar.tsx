@@ -13,6 +13,7 @@ import {
   Cpu,
   ArrowsClockwise,
 } from '@phosphor-icons/react';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
 import { getRoleBadge, isRoleAllowedForTab } from '../../utils/rbac';
 
@@ -160,11 +161,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
             isCollapsed ? 'justify-center p-1' : 'p-2 gap-2.5 w-full'
           }`}
         >
-          <img
-            src={currentUser.avatarUrl}
-            alt=""
-            className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 flex-shrink-0"
-          />
+          <Avatar className="w-8 h-8 rounded-full ring-1 ring-slate-200 shrink-0">
+            <AvatarImage
+              src={currentUser.avatarUrl}
+              alt={currentUser.fullName}
+              className="rounded-full object-cover"
+            />
+            <AvatarFallback className="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xs">
+              {currentUser.fullName
+                ? currentUser.fullName
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()
+                : 'U'}
+            </AvatarFallback>
+          </Avatar>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
