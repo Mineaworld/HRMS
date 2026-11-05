@@ -40,7 +40,24 @@ export const App: React.FC = () => {
     syncWithGateway,
   } = useHrmsStore();
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const search = new URLSearchParams(window.location.search);
+      if (search.get('collapsed') === 'true') return true;
+      return localStorage.getItem('hrms_sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
+
+  const handleToggleCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hrms_sidebar_collapsed', String(next));
+      }
+      return next;
+    });
+  };
   const roleBadge = getRoleBadge(currentUser.role);
   const permissions = ROLE_PERMISSIONS[currentUser.role] || [];
 
@@ -301,7 +318,7 @@ export const App: React.FC = () => {
       {/* 1. Left Sidebar (shadcn-style collapsible) */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onToggleCollapse={handleToggleCollapse}
       />
 
       {/* 2. Main Central Work Area */}

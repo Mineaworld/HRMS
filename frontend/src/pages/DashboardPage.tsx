@@ -18,7 +18,7 @@ import { useHrmsStore } from '../store/useHrmsStore';
 import { getRoleBadge } from '../utils/rbac';
 
 export const DashboardPage: React.FC = () => {
-  const { currentUser, employees, departments, jobs, leaves, dashboardSummary } = useHrmsStore();
+  const { currentUser, employees, departments, jobs, leaves, dashboardSummary, isLoading } = useHrmsStore();
   const roleBadge = getRoleBadge(currentUser.role);
 
   const totalEmployees = dashboardSummary?.totalEmployees ?? employees.length;
@@ -26,6 +26,13 @@ export const DashboardPage: React.FC = () => {
   const totalDepartments = dashboardSummary?.totalDepartments ?? departments.length;
   const totalJobs = dashboardSummary?.totalJobs ?? (jobs.length || 23);
   const pendingLeaves = leaves.filter((l) => l.status === 'PENDING').length;
+
+  const renderMetric = (val: number) => {
+    if (isLoading && val === 0) {
+      return <div className="h-7 w-12 bg-slate-200/80 animate-pulse rounded-lg mt-0.5" />;
+    }
+    return String(val).padStart(2, '0');
+  };
 
   return (
     <div className="space-y-6 pb-10">
@@ -50,35 +57,35 @@ export const DashboardPage: React.FC = () => {
       {/* 1. Top Metrics Row (5 Cards - Bound to Real Gateway & PostgreSQL Telemetry) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard
-          value={String(totalEmployees).padStart(2, '0')}
+          value={renderMetric(totalEmployees)}
           title="Total Workforce"
           subtitle="Registered company roster"
           icon={UsersThree}
           accent="blue"
         />
         <MetricCard
-          value={String(activeEmployees).padStart(2, '0')}
+          value={renderMetric(activeEmployees)}
           title="Active Staff"
           subtitle="Operational personnel"
           icon={CheckCircle}
           accent="green"
         />
         <MetricCard
-          value={String(totalDepartments).padStart(2, '0')}
+          value={renderMetric(totalDepartments)}
           title="Departments"
           subtitle="Operational divisions"
           icon={Buildings}
           accent="purple"
         />
         <MetricCard
-          value={String(totalJobs).padStart(2, '0')}
+          value={renderMetric(totalJobs)}
           title="Job Positions"
           subtitle="Configured career roles"
           icon={Briefcase}
           accent="cyan"
         />
         <MetricCard
-          value={String(pendingLeaves).padStart(2, '0')}
+          value={renderMetric(pendingLeaves)}
           title="Pending Requests"
           subtitle="Leaves awaiting review"
           icon={CalendarCheck}
