@@ -115,9 +115,9 @@ export const DepartmentsPage: React.FC = () => {
     setIsCreateModalOpen(false);
   };
 
-  const handleDeleteDepartment = (id: number) => {
+  const handleDeleteDepartment = async (id: number) => {
     setDeleteError(null);
-    const result = deleteDepartment(id);
+    const result = await deleteDepartment(id);
     if (!result.success && result.error) {
       setDeleteError(result.error);
     }

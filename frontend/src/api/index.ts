@@ -464,8 +464,9 @@ export const leaveApi = {
 
 export const payrollApi = {
   getAll: async (period?: string): Promise<PayrollRecord[]> => {
+    const targetPeriod = period || new Date().toISOString().substring(0, 7);
     const res = await apiClient.get<PayrollRecord[]>('/api/payroll', {
-      params: period ? { period } : undefined,
+      params: { period: targetPeriod },
     });
     return res.data;
   },

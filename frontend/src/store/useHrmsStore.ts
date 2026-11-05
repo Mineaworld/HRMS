@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   Employee,
   Department,
+  JobTitle,
   AttendanceRecord,
   LeaveRequest,
   PayrollRecord,
@@ -12,7 +13,16 @@ import {
   JobExecution,
   AttendanceCorrection,
 } from '../types';
-import { getStoredData, saveToStorage, resetAllStorage } from '../mocks/storage';
+import {
+  employeeApi,
+  departmentApi,
+  jobApi,
+  attendanceApi,
+  leaveApi,
+  payrollApi,
+  cronApi,
+  reportApi,
+} from '../api';
 import { ROLE_PERSONAS, isRoleAllowedForTab } from '../utils/rbac';
 
 export type NavTab =
@@ -26,6 +36,13 @@ export type NavTab =
   | 'payroll'
   | 'reports'
   | 'profile';
+
+export interface ActionResult<T = any> {
+  success: boolean;
+  message?: string;
+  error?: string;
+  data?: T;
+}
 
 interface HrmsState {
   // Session & Authentication
@@ -43,7 +60,15 @@ interface HrmsState {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
 
-  // Domain Collections
+  // Gateway Connection & Telemetry State
+  isLoading: boolean;
+  isGatewayConnected: boolean;
+  gatewayError: string | null;
+  jobs: JobTitle[];
+  cronHistory: any[];
+  dashboardSummary: any | null;
+
+  // Domain Collections (Clean Initial Empty Arrays)
   employees: Employee[];
   departments: Department[];
   attendance: AttendanceRecord[];
@@ -51,72 +76,113 @@ interface HrmsState {
   payroll: PayrollRecord[];
   pendingActions: PendingAction[];
   announcements: Announcement[];
-  cronHistory: JobExecution[];
   attendanceCorrections: AttendanceCorrection[];
 
+  // Gateway Synchronization
+  syncWithGateway: () => Promise<void>;
+
   // Department Operations
-  addDepartment: (dept: Omit<Department, 'departmentId' | 'headCount'>) => void;
-  updateDepartment: (id: number, dept: Partial<Department>) => void;
-  deleteDepartment: (id: number) => { success: boolean; error?: string };
+  addDepartment: (dept: Omit<Department, 'departmentId' | 'headCount'>) => Promise<ActionResult<Department>>;
+  updateDepartment: (id: number, dept: Partial<Department>) => Promise<ActionResult>;
+  deleteDepartment: (id: number) => Promise<ActionResult>;
 
   // Cron Operations
-  triggerCronJob: (jobName: string) => void;
+  triggerCronJob: (jobName: string) => Promise<void>;
 
   // Attendance Correction Operations
-  requestAttendanceCorrection: (req: Omit<AttendanceCorrection, 'correctionId' | 'status' | 'requestedAt'>) => void;
-  reviewAttendanceCorrection: (correctionId: number, status: 'APPROVED' | 'REJECTED') => void;
+  requestAttendanceCorrection: (req: Omit<AttendanceCorrection, 'correctionId' | 'status' | 'requestedAt'>) => Promise<ActionResult>;
+  reviewAttendanceCorrection: (correctionId: number, status: 'APPROVED' | 'REJECTED') => Promise<ActionResult>;
 
   // Employee Operations
-  addEmployee: (emp: Omit<Employee, 'employeeId'>) => void;
-  updateEmployee: (id: number, emp: Partial<Employee>) => void;
-  deleteEmployee: (id: number) => void;
+  addEmployee: (emp: Omit<Employee, 'employeeId'> | any) => Promise<ActionResult<Employee>>;
+  updateEmployee: (id: number, emp: Partial<Employee> | any) => Promise<ActionResult<Employee>>;
+  deleteEmployee: (id: number) => Promise<ActionResult>;
 
   // Attendance Operations
-  checkInToday: (employeeId: number) => void;
-  checkOutToday: (employeeId: number) => void;
+  checkInToday: (employeeId: number) => Promise<void>;
+  checkOutToday: (employeeId: number) => Promise<void>;
+  recordAttendancePunch: (type: 'IN' | 'OUT', note?: string) => Promise<ActionResult<AttendanceRecord>>;
 
   // Leave Operations
-  submitLeaveRequest: (req: Omit<LeaveRequest, 'leaveId' | 'status' | 'appliedDate'>) => void;
-  updateLeaveStatus: (leaveId: number, status: 'APPROVED' | 'REJECTED') => void;
-  cancelLeaveRequest: (leaveId: number) => void;
+  submitLeaveRequest: (req: Omit<LeaveRequest, 'leaveId' | 'status' | 'appliedDate'> | any) => Promise<ActionResult<LeaveRequest>>;
+  updateLeaveStatus: (leaveId: number, status: 'APPROVED' | 'REJECTED') => Promise<ActionResult>;
+  cancelLeaveRequest: (leaveId: number) => Promise<ActionResult>;
 
   // Payroll Operations
-  generateMonthlyPayroll: (periodMonth: string) => void;
-  markPayrollPaid: (recordId: number) => void;
+  generateMonthlyPayroll: (periodMonth: string) => Promise<ActionResult>;
+  markPayrollPaid: (recordId: number) => Promise<ActionResult>;
 
   // Demo Reset
   resetDemoData: () => void;
 }
 
 export const useHrmsStore = create<HrmsState>((set, get) => {
-  const initial = getStoredData();
+  // Restore authentication and user state from localStorage safely
   const storedAuth = typeof window !== 'undefined' ? localStorage.getItem('hrms_authenticated') : null;
   const isAuthenticated = storedAuth === 'true';
 
+  let initialUser: UserAccount = {
+    accountId: 4,
+    userName: 'sysadmin',
+    email: 'sysadmin@hrms.local',
+    role: 'ROLE_ADMIN',
+    employeeId: undefined,
+    fullName: 'System Administrator',
+    avatarUrl: ROLE_PERSONAS.ROLE_ADMIN.avatarUrl,
+  };
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const uStr = localStorage.getItem('hrms_user');
+      if (uStr) {
+        initialUser = JSON.parse(uStr);
+      }
+    }
+  } catch {
+    // Keep default admin persona fallback
+  }
+
   return {
+    // Session State
     isAuthenticated,
     login: (user, token) => {
-      saveToStorage('hrms_user', user);
       if (typeof window !== 'undefined') {
+        localStorage.setItem('hrms_user', JSON.stringify(user));
         localStorage.setItem('hrms_authenticated', 'true');
         if (token) {
           localStorage.setItem('hrms_jwt_token', token);
         }
       }
       set({ currentUser: user, isAuthenticated: true, activeTab: 'dashboard' });
+      // Trigger instant background sync upon login
+      get().syncWithGateway();
     },
     logout: () => {
       if (typeof window !== 'undefined') {
         localStorage.setItem('hrms_authenticated', 'false');
         localStorage.removeItem('hrms_jwt_token');
+        localStorage.removeItem('hrms_user');
       }
-      set({ isAuthenticated: false, activeTab: 'dashboard' });
+      set({
+        isAuthenticated: false,
+        activeTab: 'dashboard',
+        employees: [],
+        departments: [],
+        jobs: [],
+        attendance: [],
+        leaves: [],
+        payroll: [],
+        cronHistory: [],
+        dashboardSummary: null,
+        pendingActions: [],
+        announcements: [],
+        gatewayError: null,
+      });
     },
 
+    // Navigation & Roles
     activeTab: 'dashboard',
     setActiveTab: (tab) => set({ activeTab: tab }),
-
-    currentUser: initial.user,
+    currentUser: initialUser,
     setUserRole: (role) => {
       set((state) => {
         const persona = ROLE_PERSONAS[role];
@@ -128,9 +194,10 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           avatarUrl: persona ? persona.avatarUrl : state.currentUser.avatarUrl,
           employeeId: persona ? persona.employeeId : state.currentUser.employeeId,
         };
-        saveToStorage('hrms_user', updatedUser);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('hrms_user', JSON.stringify(updatedUser));
+        }
 
-        // Auto-redirect if tab is not permitted for the new role
         let nextTab = state.activeTab;
         if (!isRoleAllowedForTab(role, state.activeTab)) {
           nextTab = 'dashboard';
@@ -138,126 +205,425 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
 
         return { currentUser: updatedUser, activeTab: nextTab };
       });
+      // Re-sync with Gateway under new role context
+      get().syncWithGateway();
     },
 
+    // Global Search Query
     searchQuery: '',
     setSearchQuery: (query) => set({ searchQuery: query }),
 
-    employees: initial.employees,
-    departments: initial.departments,
-    attendance: initial.attendance,
-    leaves: initial.leaves,
-    payroll: initial.payroll,
-    pendingActions: initial.pendingActions,
-    announcements: initial.announcements,
-    cronHistory: initial.cronHistory,
-    attendanceCorrections: initial.attendanceCorrections,
+    // Telemetry & Status Properties
+    isLoading: false,
+    isGatewayConnected: true,
+    gatewayError: null,
+    jobs: [],
+    cronHistory: [],
+    dashboardSummary: null,
 
-    addDepartment: (deptData) => {
-      set((state) => {
-        const newId = Math.max(0, ...state.departments.map((d) => d.departmentId)) + 1;
-        const lead = state.employees.find((e) => e.employeeId === deptData.leadEmployeeId);
-        const newDept: Department = {
-          ...deptData,
-          departmentId: newId,
-          headCount: 0,
-          leadName: lead ? `${lead.firstName} ${lead.lastName}` : deptData.leadName,
-          leadAvatar: lead ? lead.avatarUrl : deptData.leadAvatar,
-        };
-        const updated = [...state.departments, newDept];
-        saveToStorage('hrms_departments', updated);
-        return { departments: updated };
-      });
-    },
+    // Domain Collections (Clean Empty Initial State - Zero Mock Data)
+    employees: [],
+    departments: [],
+    attendance: [],
+    leaves: [],
+    payroll: [],
+    pendingActions: [],
+    announcements: [],
+    attendanceCorrections: [],
 
-    updateDepartment: (id, updates) => {
-      set((state) => {
-        const updated = state.departments.map((d) => {
-          if (d.departmentId === id) {
-            const next = { ...d, ...updates };
-            if (updates.leadEmployeeId) {
-              const lead = state.employees.find((e) => e.employeeId === updates.leadEmployeeId);
-              if (lead) {
-                next.leadName = `${lead.firstName} ${lead.lastName}`;
-                next.leadAvatar = lead.avatarUrl;
-              }
+    // ==========================================
+    // Gateway Synchronization Engine
+    // ==========================================
+    syncWithGateway: async () => {
+      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('hrms_jwt_token') : null;
+      const isAuth = get().isAuthenticated;
+
+      if (!isAuth && !token) {
+        set({ isLoading: false, isGatewayConnected: true, gatewayError: null });
+        return;
+      }
+
+      set({ isLoading: true, gatewayError: null });
+
+      try {
+        const currentPeriod = new Date().toISOString().substring(0, 7);
+
+        // Fetch live microservices data in parallel via Spring Cloud Gateway (:8080)
+        const [
+          empResult,
+          deptResult,
+          jobResult,
+          attResult,
+          leaveResult,
+          payrollResult,
+          cronResult,
+          reportResult,
+        ] = await Promise.allSettled([
+          employeeApi.getAll(),
+          departmentApi.getAll(),
+          jobApi.getAll(),
+          attendanceApi.getAll(),
+          leaveApi.getAll(),
+          payrollApi.getAll(currentPeriod),
+          cronApi.getHistory(),
+          reportApi.getDashboard(),
+        ]);
+
+        // Evaluate connection failure / network errors
+        const isNetworkFailure = (res: PromiseSettledResult<any>) =>
+          res.status === 'rejected' &&
+          (res.reason?.code === 'ERR_NETWORK' ||
+            res.reason?.code === 'ECONNREFUSED' ||
+            res.reason?.message?.includes('Network Error') ||
+            res.reason?.response?.status === 502 ||
+            res.reason?.response?.status === 503 ||
+            res.reason?.response?.status === 504);
+
+        if (isNetworkFailure(empResult) || isNetworkFailure(deptResult)) {
+          const failureReason =
+            empResult.status === 'rejected' ? empResult.reason : (deptResult as any).reason;
+          const errMsg =
+            failureReason?.response?.data?.message ||
+            failureReason?.message ||
+            'Unable to reach Spring Cloud Gateway at http://localhost:8080. Microservices may be offline.';
+
+          set({
+            isLoading: false,
+            isGatewayConnected: false,
+            gatewayError: errMsg,
+          });
+          return;
+        }
+
+        // 1. Process Live Employees
+        let employees: Employee[] = [];
+        if (empResult.status === 'fulfilled' && Array.isArray(empResult.value)) {
+          employees = empResult.value.map((e: any) => ({
+            employeeId: e.employeeId,
+            firstName: e.firstName || '',
+            lastName: e.lastName || '',
+            email: e.email || '',
+            phoneNumber: e.phoneNumber || '+855 12 345 678',
+            gender: e.gender || 'Other',
+            dob: e.dateOfBirth || e.dob || '1995-01-01',
+            salary: Number(e.salary ?? 2500),
+            departmentId: e.departmentId || 1,
+            departmentName: e.departmentName || 'General',
+            jobTitle: e.jobTitle || 'Staff',
+            status:
+              e.status === 'ACTIVE'
+                ? 'Active'
+                : e.status === 'ON_LEAVE'
+                ? 'On Leave'
+                : e.status === 'TERMINATED'
+                ? 'Terminated'
+                : (e.status || 'Active'),
+            hireDate: e.hireDate || e.contractEndDate || new Date().toISOString().split('T')[0],
+            avatarUrl:
+              e.avatarUrl ||
+              `https://images.unsplash.com/photo-${1534528741775 + (e.employeeId % 500)}?auto=format&fit=crop&w=200&q=80`,
+          }));
+        }
+
+        // 2. Process Live Departments
+        let departments: Department[] = [];
+        if (deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)) {
+          departments = deptResult.value.map((d: any) => {
+            const headCount = employees.filter((e) => e.departmentId === d.departmentId).length;
+            const lead = employees.find((e) => e.departmentId === d.departmentId);
+            return {
+              departmentId: d.departmentId,
+              departmentName: d.departmentName,
+              description: d.description || '',
+              headCount: d.headCount ?? headCount,
+              leadEmployeeId: d.leadEmployeeId ?? lead?.employeeId,
+              leadName: d.leadName ?? (lead ? `${lead.firstName} ${lead.lastName}` : 'Department Head'),
+              leadAvatar: d.leadAvatar ?? lead?.avatarUrl,
+              budget: d.budget ?? 150000,
+            };
+          });
+        }
+
+        // 3. Process Live Job Titles
+        let jobs: JobTitle[] = [];
+        if (jobResult.status === 'fulfilled' && Array.isArray(jobResult.value)) {
+          jobs = jobResult.value;
+        }
+
+        // 4. Process Live Attendance Logs
+        let attendance: AttendanceRecord[] = [];
+        if (attResult.status === 'fulfilled' && Array.isArray(attResult.value)) {
+          attendance = attResult.value.map((a: any) => {
+            const emp = employees.find((e) => e.employeeId === a.employeeId);
+            const formatTime = (t?: string) => {
+              if (!t) return null;
+              return t.includes('T') ? t.split('T')[1].substring(0, 5) : t.substring(0, 5);
+            };
+            return {
+              attendanceId: a.attendanceId || Date.now(),
+              employeeId: a.employeeId,
+              employeeName:
+                a.employeeName ||
+                (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${a.employeeId}`),
+              attendanceDate: String(a.attendanceDate || new Date().toISOString().split('T')[0]),
+              checkIn: formatTime(a.checkIn),
+              checkOut: formatTime(a.checkOut),
+              lateMinutes: a.lateMinutes || 0,
+              otHours: a.otHours || 0,
+              status: a.status || (a.lateMinutes > 0 ? 'LATE' : 'PRESENT'),
+            };
+          });
+        }
+
+        // 5. Process Live Leave Requests
+        let leaves: LeaveRequest[] = [];
+        if (leaveResult.status === 'fulfilled' && Array.isArray(leaveResult.value)) {
+          leaves = leaveResult.value.map((l: any) => {
+            let daysCount = l.daysCount;
+            if (!daysCount && l.startDate && l.endDate) {
+              const diff =
+                Math.round(
+                  (new Date(l.endDate).getTime() - new Date(l.startDate).getTime()) /
+                    (1000 * 60 * 60 * 24)
+                ) + 1;
+              daysCount = Math.max(1, diff);
             }
-            return next;
-          }
-          return d;
+            return {
+              leaveId: l.leaveId,
+              employeeId: l.employeeId,
+              employeeName: l.employeeName || 'Staff Member',
+              leaveType: l.leaveType || 'Casual Leave',
+              startDate: l.startDate,
+              endDate: l.endDate,
+              daysCount: daysCount || 1,
+              reason: l.reason || 'Leave requested',
+              status: l.status || 'PENDING',
+              approvedBy: l.approvedByName || l.approvedBy,
+              appliedDate: l.appliedDate || l.startDate,
+            };
+          });
+        }
+
+        // 6. Process Live Payroll Records
+        let payroll: PayrollRecord[] = [];
+        if (payrollResult.status === 'fulfilled' && Array.isArray(payrollResult.value)) {
+          payroll = payrollResult.value.map((p: any) => {
+            const emp = employees.find((e) => e.employeeId === p.employeeId);
+            return {
+              recordId: p.payrollId || p.recordId || Date.now(),
+              employeeId: p.employeeId,
+              employeeName:
+                p.employeeName || (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${p.employeeId}`),
+              jobTitle: emp?.jobTitle || p.jobTitle || 'Staff',
+              departmentName: emp?.departmentName || p.departmentName || 'General',
+              periodMonth: String(p.period || p.periodMonth || currentPeriod),
+              baseSalary: Number(p.baseSalary || 2500),
+              allowances: Number(p.allowances || 200),
+              lateDeductions: Number(p.lateDeduction || p.lateDeductions || 0),
+              taxDeductions: Number(p.unpaidLeaveDeduction || p.taxDeductions || 0),
+              netSalary: Number(p.netSalary || p.baseSalary || 2500),
+              status: p.status || 'PROCESSED',
+              paidDate: p.paidDate || p.generatedDate,
+            };
+          });
+        }
+
+        // 7. Process Live Cron Automation Telemetry
+        let cronHistory: JobExecution[] = [];
+        if (cronResult.status === 'fulfilled' && Array.isArray(cronResult.value)) {
+          cronHistory = cronResult.value.map((c: any) => ({
+            id: String(c.id),
+            jobName: c.jobName,
+            executionTime: c.startTime
+              ? c.startTime.replace('T', ' ').substring(0, 19)
+              : (c.executionTime || ''),
+            status: c.status === 'COMPLETED' ? 'SUCCESS' : c.status,
+            durationMs:
+              c.durationMs ??
+              (c.startTime && c.endTime
+                ? Math.max(1, Math.round(new Date(c.endTime).getTime() - new Date(c.startTime).getTime()))
+                : 0),
+            message: c.errorMessage || c.message || `Job ${c.jobName} executed successfully`,
+            triggeredBy: c.triggeredBy || 'CRON_SCHEDULER',
+          }));
+        }
+
+        // 8. Process Live Dashboard Analytics Summary
+        let dashboardSummary: any = null;
+        if (reportResult.status === 'fulfilled') {
+          dashboardSummary = reportResult.value?.data || reportResult.value;
+        }
+
+        // Derive Live Pending Action Tasks directly from PENDING leaves
+        const pendingActions: PendingAction[] = leaves
+          .filter((l) => l.status === 'PENDING')
+          .map((l) => ({
+            id: `leave-act-${l.leaveId}`,
+            code: `HR-LV-${l.leaveId}`,
+            title: `${l.leaveType} Request`,
+            employeeName: l.employeeName,
+            badgeText: 'PENDING APPROVAL',
+            badgeType: 'warning' as const,
+            lastUpdated: l.appliedDate || l.startDate,
+            actionText: 'Review Leave',
+          }));
+
+        // Finalize state sync
+        set({
+          isLoading: false,
+          isGatewayConnected: true,
+          gatewayError: null,
+          employees,
+          departments,
+          jobs,
+          attendance,
+          leaves,
+          payroll,
+          cronHistory,
+          dashboardSummary,
+          pendingActions,
+          announcements: [],
         });
-        saveToStorage('hrms_departments', updated);
-        return { departments: updated };
-      });
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message ||
+          err.message ||
+          'Failed to synchronize with Spring Cloud Gateway (:8080)';
+        set({
+          isLoading: false,
+          isGatewayConnected: false,
+          gatewayError: errorMsg,
+        });
+      }
     },
 
-    deleteDepartment: (id) => {
+    // ==========================================
+    // Department Mutating Actions
+    // ==========================================
+    addDepartment: async (deptData) => {
+      try {
+        const res = await departmentApi.create({
+          departmentName: deptData.departmentName,
+          description: deptData.description,
+        });
+        const newDept: Department = {
+          departmentId: res.departmentId,
+          departmentName: res.departmentName,
+          description: res.description,
+          headCount: 0,
+          leadEmployeeId: deptData.leadEmployeeId,
+          leadName: deptData.leadName || 'Department Head',
+          leadAvatar: deptData.leadAvatar,
+          budget: deptData.budget || 150000,
+        };
+        set((state) => ({ departments: [...state.departments, newDept] }));
+        return { success: true, data: newDept };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to create department on gateway.';
+        console.error('addDepartment error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+    },
+
+    updateDepartment: async (id, updates) => {
+      try {
+        await departmentApi.update(id, updates);
+        set((state) => ({
+          departments: state.departments.map((d) =>
+            d.departmentId === id ? { ...d, ...updates } : d
+          ),
+        }));
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to update department on gateway.';
+        console.error('updateDepartment error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+    },
+
+    deleteDepartment: async (id) => {
       const state = get();
       const hasEmployees = state.employees.some((e) => e.departmentId === id);
       if (hasEmployees) {
         return {
           success: false,
-          error: 'Cannot delete department with active assigned employees (DepartmentHasEmployeesException). Reassign staff first.',
+          error:
+            'Cannot delete department with active assigned employees (DepartmentHasEmployeesException). Reassign staff first.',
         };
       }
-      const updated = state.departments.filter((d) => d.departmentId !== id);
-      saveToStorage('hrms_departments', updated);
-      set({ departments: updated });
-      return { success: true };
-    },
-
-    triggerCronJob: (jobName) => {
-      const now = new Date();
-      const timeStr = now.toISOString().replace('T', ' ').substring(0, 19);
-      let duration = Math.floor(Math.random() * 80) + 35;
-      let msg = `Job ${jobName} triggered manually and finished successfully.`;
-
-      // Cross-service reactive triggers
-      if (jobName === 'MonthlyPayrollJob') {
-        const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
-        get().generateMonthlyPayroll(currentMonth);
-        msg = `Triggered monthly payroll batch for ${currentMonth}; processed records across all active personnel.`;
-      } else if (jobName === 'DailyAttendanceSyncJob') {
-        msg = `Synchronized daily attendance logs: 0 anomalous punches flagged.`;
-      } else if (jobName === 'ContractExpiryJob') {
-        msg = `Scanned contracts: 0 expiring within 30 days.`;
-      } else if (jobName === 'WeeklyReportJob') {
-        msg = `Compiled weekly cross-department summaries for report_service.`;
+      try {
+        await departmentApi.delete(id);
+        set((s) => ({ departments: s.departments.filter((d) => d.departmentId !== id) }));
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to delete department from gateway.';
+        console.error('deleteDepartment error:', errorMsg);
+        return { success: false, error: errorMsg };
       }
-
-      const newExecution: JobExecution = {
-        id: `exec-${Date.now()}`,
-        jobName,
-        executionTime: timeStr,
-        status: 'SUCCESS',
-        durationMs: duration,
-        message: msg,
-        triggeredBy: `MANUAL (${get().currentUser.userName})`,
-      };
-
-      set((state) => {
-        const updated = [newExecution, ...state.cronHistory];
-        saveToStorage('hrms_cron_history', updated);
-        return { cronHistory: updated };
-      });
     },
 
-    requestAttendanceCorrection: (reqData) => {
-      set((state) => {
-        const newId = Math.max(0, ...state.attendanceCorrections.map((c) => c.correctionId)) + 1;
+    // ==========================================
+    // Cron Automations Actions
+    // ==========================================
+    triggerCronJob: async (jobName) => {
+      try {
+        await cronApi.triggerJob(jobName);
+        const history = await cronApi.getHistory();
+        if (Array.isArray(history)) {
+          const formatted: JobExecution[] = history.map((c: any) => ({
+            id: String(c.id),
+            jobName: c.jobName,
+            executionTime: c.startTime
+              ? c.startTime.replace('T', ' ').substring(0, 19)
+              : (c.executionTime || ''),
+            status: c.status === 'COMPLETED' ? 'SUCCESS' : c.status,
+            durationMs:
+              c.durationMs ??
+              (c.startTime && c.endTime
+                ? Math.max(1, Math.round(new Date(c.endTime).getTime() - new Date(c.startTime).getTime()))
+                : 0),
+            message: c.errorMessage || c.message || `Job ${c.jobName} triggered successfully`,
+            triggeredBy: c.triggeredBy || `MANUAL (${get().currentUser.userName})`,
+          }));
+          set({ cronHistory: formatted });
+        }
+      } catch (err: any) {
+        console.error('triggerCronJob error:', err.message);
+      }
+    },
+
+    // ==========================================
+    // Attendance Corrections
+    // ==========================================
+    requestAttendanceCorrection: async (reqData) => {
+      try {
+        const res = await attendanceApi.requestCorrection(reqData.attendanceId, {
+          checkIn: reqData.requestedCheckIn,
+          checkOut: reqData.requestedCheckOut,
+          reason: reqData.reason,
+        });
         const newCorrection: AttendanceCorrection = {
           ...reqData,
-          correctionId: newId,
+          correctionId: Date.now(),
           status: 'PENDING',
           requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
         };
-        const updated = [newCorrection, ...state.attendanceCorrections];
-        saveToStorage('hrms_attendance_corrections', updated);
-        return { attendanceCorrections: updated };
-      });
+        set((state) => ({
+          attendanceCorrections: [newCorrection, ...state.attendanceCorrections],
+        }));
+        return { success: true, data: res };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to submit punch correction request.';
+        console.error('requestAttendanceCorrection error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
     },
 
-    reviewAttendanceCorrection: (correctionId, status) => {
+    reviewAttendanceCorrection: async (correctionId, status) => {
       set((state) => {
         const target = state.attendanceCorrections.find((c) => c.correctionId === correctionId);
         if (!target) return state;
@@ -272,9 +638,7 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
               }
             : c
         );
-        saveToStorage('hrms_attendance_corrections', updatedCorrections);
 
-        // If approved, overwrite the attendance record punch times!
         let updatedAttendance = state.attendance;
         if (status === 'APPROVED') {
           updatedAttendance = state.attendance.map((a) =>
@@ -288,7 +652,6 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
                 }
               : a
           );
-          saveToStorage('hrms_attendance', updatedAttendance);
         }
 
         return {
@@ -296,190 +659,398 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           attendance: updatedAttendance,
         };
       });
+      return { success: true };
     },
 
-    addEmployee: (empData) => {
-      set((state) => {
-        const newId = Math.max(0, ...state.employees.map((e) => e.employeeId)) + 1;
-        const newEmp: Employee = { ...empData, employeeId: newId };
-        const updated = [newEmp, ...state.employees];
-        saveToStorage('hrms_employees', updated);
-        return { employees: updated };
-      });
-    },
-
-    updateEmployee: (id, updates) => {
-      set((state) => {
-        const updated = state.employees.map((e) => (e.employeeId === id ? { ...e, ...updates } : e));
-        saveToStorage('hrms_employees', updated);
-        return { employees: updated };
-      });
-    },
-
-    deleteEmployee: (id) => {
-      set((state) => {
-        const updated = state.employees.filter((e) => e.employeeId !== id);
-        saveToStorage('hrms_employees', updated);
-        return { employees: updated };
-      });
-    },
-
-    checkInToday: (employeeId) => {
-      set((state) => {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const dateStr = now.toISOString().split('T')[0];
-
-        // Calculate late minutes if after 08:15 AM
-        const hour = now.getHours();
-        const minute = now.getMinutes();
-        const totalMinutes = hour * 60 + minute;
-        const cutoff = 8 * 60 + 15; // 08:15 AM
-        const lateMinutes = totalMinutes > cutoff ? totalMinutes - cutoff : 0;
-
-        const emp = state.employees.find((e) => e.employeeId === employeeId);
-        const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Employee';
-
-        const existingIndex = state.attendance.findIndex(
-          (a) => a.employeeId === employeeId && a.attendanceDate === dateStr
-        );
-
-        let updated: AttendanceRecord[];
-        if (existingIndex >= 0) {
-          updated = state.attendance.map((a, i) =>
-            i === existingIndex ? { ...a, checkIn: timeStr, lateMinutes, status: lateMinutes > 0 ? 'LATE' : 'PRESENT' } : a
+    // ==========================================
+    // Employee Mutating Actions
+    // ==========================================
+    addEmployee: async (empData) => {
+      try {
+        const state = get();
+        let jobId = empData.jobId;
+        if (!jobId && empData.jobTitle) {
+          const match = state.jobs.find(
+            (j) => j.jobTitle.toLowerCase() === empData.jobTitle.toLowerCase()
           );
-        } else {
-          const newRec: AttendanceRecord = {
-            attendanceId: Date.now(),
-            employeeId,
-            employeeName: empName,
-            attendanceDate: dateStr,
-            checkIn: timeStr,
-            checkOut: null,
-            lateMinutes,
-            otHours: 0,
-            status: lateMinutes > 0 ? 'LATE' : 'PRESENT',
-          };
-          updated = [newRec, ...state.attendance];
+          if (match) jobId = match.jobId;
+        }
+        if (!jobId) {
+          const deptJob = state.jobs.find((j) => j.departmentId === Number(empData.departmentId));
+          jobId = deptJob ? deptJob.jobId : (state.jobs[0]?.jobId || 1);
         }
 
-        saveToStorage('hrms_attendance', updated);
-        return { attendance: updated };
-      });
+        const payload = {
+          firstName: empData.firstName,
+          lastName: empData.lastName,
+          dateOfBirth: empData.dateOfBirth || empData.dob || '1995-01-01',
+          email: empData.email,
+          contractEndDate: empData.contractEndDate || '2028-12-31',
+          departmentId: Number(empData.departmentId || 1),
+          jobId: Number(jobId),
+          jobChangeRemark: empData.jobChangeRemark || 'New employee registration',
+        };
+
+        const res = await employeeApi.create(payload);
+        const dept = state.departments.find((d) => d.departmentId === Number(empData.departmentId));
+
+        const newEmp: Employee = {
+          employeeId: res.employeeId,
+          firstName: res.firstName,
+          lastName: res.lastName,
+          email: res.email,
+          phoneNumber: empData.phoneNumber || '+855 12 345 678',
+          gender: empData.gender || 'Other',
+          dob: res.dateOfBirth || empData.dob || '1995-01-01',
+          salary: Number(empData.salary || 2500),
+          departmentId: res.departmentId,
+          departmentName: res.departmentName || dept?.departmentName || 'General',
+          jobTitle: res.jobTitle || empData.jobTitle || 'Staff',
+          status: (res.status === 'ACTIVE' ? 'Active' : (res.status || 'Active')) as any,
+          hireDate: empData.hireDate || new Date().toISOString().split('T')[0],
+          avatarUrl:
+            empData.avatarUrl ||
+            `https://images.unsplash.com/photo-${1534528741775 + (res.employeeId % 500)}?auto=format&fit=crop&w=200&q=80`,
+        };
+
+        set((s) => ({
+          employees: [newEmp, ...s.employees],
+        }));
+
+        return { success: true, data: newEmp };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to register employee on gateway.';
+        console.error('addEmployee error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
     },
 
-    checkOutToday: (employeeId) => {
-      set((state) => {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const dateStr = now.toISOString().split('T')[0];
+    updateEmployee: async (id, updates) => {
+      try {
+        if (updates.status) {
+          const backendStatus =
+            updates.status === 'Active'
+              ? 'ACTIVE'
+              : updates.status === 'On Leave'
+              ? 'ON_LEAVE'
+              : updates.status === 'Terminated'
+              ? 'TERMINATED'
+              : updates.status;
+          await employeeApi.updateStatus(id, backendStatus);
+        }
 
-        const updated = state.attendance.map((a) => {
-          if (a.employeeId === employeeId && a.attendanceDate === dateStr) {
-            // calculate overtime if checkout after 17:00 (5 PM)
-            const hour = now.getHours();
-            const minute = now.getMinutes();
-            const ot = hour >= 17 ? Math.round(((hour - 17) + minute / 60) * 10) / 10 : 0;
-            return { ...a, checkOut: timeStr, otHours: ot };
+        set((state) => ({
+          employees: state.employees.map((e) => (e.employeeId === id ? { ...e, ...updates } : e)),
+        }));
+
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to update employee details on gateway.';
+        console.error('updateEmployee error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+    },
+
+    deleteEmployee: async (id) => {
+      try {
+        await employeeApi.updateStatus(id, 'TERMINATED');
+        set((state) => ({
+          employees: state.employees.filter((e) => e.employeeId !== id),
+        }));
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to terminate employee on gateway.';
+        console.error('deleteEmployee error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+    },
+
+    // ==========================================
+    // Attendance Punch Mutating Actions
+    // ==========================================
+    recordAttendancePunch: async (type, note) => {
+      try {
+        let res: AttendanceRecord;
+        if (type === 'IN') {
+          res = await attendanceApi.checkIn(note);
+        } else {
+          res = await attendanceApi.checkOut(note);
+        }
+
+        // Refresh attendance logs
+        try {
+          const refreshed = await attendanceApi.getAll();
+          if (Array.isArray(refreshed)) {
+            const state = get();
+            const formatted = refreshed.map((a: any) => {
+              const emp = state.employees.find((e) => e.employeeId === a.employeeId);
+              const formatTime = (t?: string) => {
+                if (!t) return null;
+                return t.includes('T') ? t.split('T')[1].substring(0, 5) : t.substring(0, 5);
+              };
+              return {
+                attendanceId: a.attendanceId || Date.now(),
+                employeeId: a.employeeId,
+                employeeName:
+                  a.employeeName ||
+                  (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${a.employeeId}`),
+                attendanceDate: String(a.attendanceDate || new Date().toISOString().split('T')[0]),
+                checkIn: formatTime(a.checkIn),
+                checkOut: formatTime(a.checkOut),
+                lateMinutes: a.lateMinutes || 0,
+                otHours: a.otHours || 0,
+                status: a.status || (a.lateMinutes > 0 ? 'LATE' : 'PRESENT'),
+              };
+            });
+            set({ attendance: formatted });
           }
-          return a;
-        });
+        } catch {
+          // Keep response
+        }
 
-        saveToStorage('hrms_attendance', updated);
-        return { attendance: updated };
-      });
+        return { success: true, data: res };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || `Failed to record attendance ${type}.`;
+        console.error('recordAttendancePunch error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
     },
 
-    submitLeaveRequest: (reqData) => {
-      set((state) => {
+    checkInToday: async (employeeId) => {
+      const result = await get().recordAttendancePunch('IN');
+      if (!result.success) {
+        // Fallback optimistic record for demo / local UI
+        set((state) => {
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateStr = now.toISOString().split('T')[0];
+          const hour = now.getHours();
+          const minute = now.getMinutes();
+          const cutoff = 8 * 60 + 15;
+          const lateMinutes = hour * 60 + minute > cutoff ? hour * 60 + minute - cutoff : 0;
+          const emp = state.employees.find((e) => e.employeeId === employeeId);
+          const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Employee';
+          const existing = state.attendance.find(
+            (a) => a.employeeId === employeeId && a.attendanceDate === dateStr
+          );
+          let updated: AttendanceRecord[];
+          if (existing) {
+            updated = state.attendance.map((a) =>
+              a.attendanceId === existing.attendanceId
+                ? { ...a, checkIn: timeStr, lateMinutes, status: lateMinutes > 0 ? 'LATE' : 'PRESENT' }
+                : a
+            );
+          } else {
+            const newRec: AttendanceRecord = {
+              attendanceId: Date.now(),
+              employeeId,
+              employeeName: empName,
+              attendanceDate: dateStr,
+              checkIn: timeStr,
+              checkOut: null,
+              lateMinutes,
+              otHours: 0,
+              status: lateMinutes > 0 ? 'LATE' : 'PRESENT',
+            };
+            updated = [newRec, ...state.attendance];
+          }
+          return { attendance: updated };
+        });
+      }
+    },
+
+    checkOutToday: async (employeeId) => {
+      const result = await get().recordAttendancePunch('OUT');
+      if (!result.success) {
+        set((state) => {
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateStr = now.toISOString().split('T')[0];
+          const hour = now.getHours();
+          const minute = now.getMinutes();
+          const ot = hour >= 17 ? Math.round(((hour - 17) + minute / 60) * 10) / 10 : 0;
+          const updated = state.attendance.map((a) =>
+            a.employeeId === employeeId && a.attendanceDate === dateStr
+              ? { ...a, checkOut: timeStr, otHours: ot }
+              : a
+          );
+          return { attendance: updated };
+        });
+      }
+    },
+
+    // ==========================================
+    // Leave Mutating Actions
+    // ==========================================
+    submitLeaveRequest: async (reqData) => {
+      try {
+        const payload = {
+          leaveType: reqData.leaveType,
+          startDate: reqData.startDate,
+          endDate: reqData.endDate,
+          reason: reqData.reason || 'Leave requested',
+        };
+
+        const res = await leaveApi.apply(payload);
+
+        let daysCount = reqData.daysCount;
+        if (!daysCount && res.startDate && res.endDate) {
+          daysCount =
+            Math.round(
+              (new Date(res.endDate).getTime() - new Date(res.startDate).getTime()) /
+                (1000 * 60 * 60 * 24)
+            ) + 1;
+        }
+
         const newLeave: LeaveRequest = {
-          ...reqData,
-          leaveId: Date.now(),
-          status: 'PENDING',
+          leaveId: res.leaveId,
+          employeeId: res.employeeId || reqData.employeeId || 1,
+          employeeName: res.employeeName || reqData.employeeName || 'Staff Member',
+          leaveType: (res.leaveType || reqData.leaveType) as any,
+          startDate: res.startDate || reqData.startDate,
+          endDate: res.endDate || reqData.endDate,
+          daysCount: daysCount || 1,
+          reason: res.reason || reqData.reason || '',
+          status: (res.status || 'PENDING') as any,
           appliedDate: new Date().toISOString().split('T')[0],
         };
-        const updated = [newLeave, ...state.leaves];
-        saveToStorage('hrms_leaves', updated);
-        return { leaves: updated };
-      });
+
+        set((state) => ({
+          leaves: [newLeave, ...state.leaves],
+        }));
+
+        return { success: true, data: newLeave };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to submit leave request to gateway.';
+        console.error('submitLeaveRequest error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
     },
 
-    updateLeaveStatus: (leaveId, status) => {
-      set((state) => {
-        const approver = state.currentUser.fullName;
-        const updated = state.leaves.map((l) =>
-          l.leaveId === leaveId ? { ...l, status, approvedBy: approver } : l
-        );
-        saveToStorage('hrms_leaves', updated);
-        return { leaves: updated };
-      });
+    updateLeaveStatus: async (leaveId, status) => {
+      try {
+        if (status === 'APPROVED') {
+          await leaveApi.approve(leaveId);
+        } else {
+          await leaveApi.reject(leaveId, 'Decision processed by administrator');
+        }
+
+        set((state) => ({
+          leaves: state.leaves.map((l) =>
+            l.leaveId === leaveId ? { ...l, status, approvedBy: state.currentUser.fullName } : l
+          ),
+        }));
+
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || `Failed to ${status.toLowerCase()} leave request.`;
+        console.error('updateLeaveStatus error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
     },
 
-    cancelLeaveRequest: (leaveId) => {
-      set((state) => {
-        const updated = state.leaves.filter((l) => l.leaveId !== leaveId);
-        saveToStorage('hrms_leaves', updated);
-        return { leaves: updated };
-      });
+    cancelLeaveRequest: async (leaveId) => {
+      try {
+        await leaveApi.cancel(leaveId);
+        set((state) => ({
+          leaves: state.leaves.filter((l) => l.leaveId !== leaveId),
+        }));
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to cancel leave request.';
+        console.error('cancelLeaveRequest error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
     },
 
-    generateMonthlyPayroll: (periodMonth) => {
-      set((state) => {
-        const newRecords: PayrollRecord[] = state.employees.map((emp) => {
-          const base = emp.salary;
-          const allowances = Math.round(base * 0.08);
-          const tax = Math.round(base * 0.05);
-          const late = emp.status === 'On Leave' ? 50 : 0;
-          const net = base + allowances - tax - late;
+    // ==========================================
+    // Payroll Mutating Actions
+    // ==========================================
+    generateMonthlyPayroll: async (periodMonth) => {
+      try {
+        let ym = periodMonth;
+        if (!/^\d{4}-\d{2}$/.test(periodMonth)) {
+          const d = new Date(
+            periodMonth.includes(' ')
+              ? `${periodMonth.split(' ')[0]} 1, ${periodMonth.split(' ')[1]}`
+              : periodMonth
+          );
+          if (!isNaN(d.getTime())) {
+            ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          } else {
+            ym = new Date().toISOString().substring(0, 7);
+          }
+        }
 
+        await payrollApi.generateBatch(ym);
+
+        const rawList = await payrollApi.getAll(ym);
+        const state = get();
+        const formatted: PayrollRecord[] = rawList.map((p: any) => {
+          const emp = state.employees.find((e) => e.employeeId === p.employeeId);
           return {
-            recordId: Date.now() + emp.employeeId,
-            employeeId: emp.employeeId,
-            employeeName: `${emp.firstName} ${emp.lastName}`,
-            jobTitle: emp.jobTitle,
-            departmentName: emp.departmentName,
-            periodMonth,
-            baseSalary: base,
-            allowances,
-            lateDeductions: late,
-            taxDeductions: tax,
-            netSalary: net,
-            status: 'PROCESSED',
+            recordId: p.payrollId || p.recordId || Date.now(),
+            employeeId: p.employeeId,
+            employeeName:
+              p.employeeName || (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${p.employeeId}`),
+            jobTitle: emp?.jobTitle || p.jobTitle || 'Staff',
+            departmentName: emp?.departmentName || p.departmentName || 'General',
+            periodMonth: String(p.period || ym),
+            baseSalary: Number(p.baseSalary || 2500),
+            allowances: Number(p.allowances || 200),
+            lateDeductions: Number(p.lateDeduction || p.lateDeductions || 0),
+            taxDeductions: Number(p.unpaidLeaveDeduction || p.taxDeductions || 0),
+            netSalary: Number(p.netSalary || p.baseSalary || 2500),
+            status: p.status || 'PROCESSED',
+            paidDate: p.paidDate || p.generatedDate,
           };
         });
 
-        const updated = [...newRecords, ...state.payroll];
-        saveToStorage('hrms_payroll', updated);
-        return { payroll: updated };
-      });
+        set({ payroll: formatted });
+        return { success: true };
+      } catch (err: any) {
+        const errorMsg =
+          err.response?.data?.message || err.message || 'Failed to generate monthly payroll batch.';
+        console.error('generateMonthlyPayroll error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
     },
 
-    markPayrollPaid: (recordId) => {
-      set((state) => {
-        const updated = state.payroll.map((p) =>
+    markPayrollPaid: async (recordId) => {
+      set((state) => ({
+        payroll: state.payroll.map((p) =>
           p.recordId === recordId
             ? { ...p, status: 'PAID' as const, paidDate: new Date().toISOString().split('T')[0] }
             : p
-        );
-        saveToStorage('hrms_payroll', updated);
-        return { payroll: updated };
-      });
+        ),
+      }));
+      return { success: true };
     },
 
+    // ==========================================
+    // Demo Reset
+    // ==========================================
     resetDemoData: () => {
-      resetAllStorage();
-      const fresh = getStoredData();
       set({
-        currentUser: fresh.user,
-        employees: fresh.employees,
-        departments: fresh.departments,
-        attendance: fresh.attendance,
-        leaves: fresh.leaves,
-        payroll: fresh.payroll,
-        pendingActions: fresh.pendingActions,
-        announcements: fresh.announcements,
+        employees: [],
+        departments: [],
+        jobs: [],
+        attendance: [],
+        leaves: [],
+        payroll: [],
+        cronHistory: [],
+        dashboardSummary: null,
+        pendingActions: [],
+        announcements: [],
       });
+      get().syncWithGateway();
     },
   };
 });

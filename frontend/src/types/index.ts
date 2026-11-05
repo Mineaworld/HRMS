@@ -15,15 +15,17 @@ export interface Employee {
   firstName: string;
   lastName: string;
   email: string;
-  phoneNumber: string;
-  gender: 'Male' | 'Female' | 'Other';
-  dob: string;
+  phoneNumber?: string;
+  gender?: 'Male' | 'Female' | 'Other' | string;
+  dob?: string;
+  dateOfBirth?: string;
   salary: number;
   departmentId: number;
   departmentName: string;
   jobTitle: string;
-  status: 'Active' | 'On Leave' | 'Terminated';
-  hireDate: string;
+  status: 'Active' | 'On Leave' | 'Terminated' | 'ACTIVE' | 'ON_LEAVE' | 'TERMINATED' | string;
+  hireDate?: string;
+  contractEndDate?: string;
   avatarUrl?: string;
 }
 
@@ -36,6 +38,16 @@ export interface Department {
   leadName?: string;
   leadAvatar?: string;
   budget?: number;
+}
+
+export interface JobTitle {
+  jobId: number;
+  jobTitle: string;
+  description?: string;
+  minSalary?: number;
+  maxSalary?: number;
+  departmentId?: number;
+  departmentName?: string;
 }
 
 export interface JobExecution {

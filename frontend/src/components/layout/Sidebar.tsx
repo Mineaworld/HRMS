@@ -11,6 +11,7 @@ import {
   SignOut,
   Buildings,
   Cpu,
+  ArrowsClockwise,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
 import { getRoleBadge, isRoleAllowedForTab } from '../../utils/rbac';
@@ -21,7 +22,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
-  const { activeTab, setActiveTab, currentUser, resetDemoData, logout } = useHrmsStore();
+  const { activeTab, setActiveTab, currentUser, syncWithGateway, logout } = useHrmsStore();
   const isEmployee = currentUser.role === 'ROLE_EMPLOYEE';
   const roleBadge = getRoleBadge(currentUser.role);
 
@@ -71,8 +72,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
     >
       {/* Brand Header */}
       <div
-        className={`flex flex-col flex-1 overflow-y-auto ${
-          isCollapsed ? 'px-2 py-3 no-scrollbar' : 'px-3 py-5'
+        className={`flex flex-col flex-1 overflow-x-hidden ${
+          isCollapsed
+            ? 'px-2 py-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+            : 'px-3 py-5 overflow-y-auto'
         }`}
       >
         <div
@@ -121,10 +124,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
               const isActive = activeTab === item.id;
 
               return (
-                <div key={item.id} className="relative group flex justify-center">
+                <div key={item.id} className="flex justify-center">
                   <button
                     onClick={() => setActiveTab(item.id)}
                     aria-label={item.label}
+                    title={isCollapsed ? item.label : undefined}
                     aria-current={isActive ? 'page' : undefined}
                     className={`flex items-center transition-all duration-150 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                       isCollapsed
@@ -142,13 +146,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
                     />
                     {!isCollapsed && <span className="truncate">{item.label}</span>}
                   </button>
-
-                  {/* Tooltip when collapsed */}
-                  {isCollapsed && (
-                    <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-slate-900 text-white text-[11px] font-medium rounded-lg shadow-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 z-50">
-                      {item.label}
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -200,17 +197,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
           <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between px-1 w-full">
             <button
               onClick={logout}
-              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-rose-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-rose-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
             >
               <SignOut weight="bold" className="w-3.5 h-3.5" />
               <span>Sign out</span>
             </button>
             <button
-              onClick={resetDemoData}
-              className="text-[10px] text-slate-400 hover:text-slate-700 transition-colors font-mono underline"
-              title="Reset demonstration state"
+              onClick={() => syncWithGateway()}
+              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
+              title="Sync state with API Gateway"
             >
-              Reset Data
+              <ArrowsClockwise weight="bold" className="w-3.5 h-3.5" />
+              <span>Sync</span>
             </button>
           </div>
         )}
