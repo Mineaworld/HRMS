@@ -101,12 +101,21 @@ export interface LeaveRequest {
   leaveId: number;
   employeeId: number;
   employeeName: string;
-  leaveType: 'Casual Leave' | 'Sick Leave' | 'Birthday / Anniv' | 'Optional Holiday' | 'Privilege Leave';
+  leaveType:
+    | 'Casual Leave'
+    | 'Sick Leave'
+    | 'Annual Leave'
+    | 'Maternity Leave'
+    | 'Unpaid Leave'
+    | 'Birthday / Anniv'
+    | 'Optional Holiday'
+    | 'Privilege Leave'
+    | string;
   startDate: string;
   endDate: string;
   daysCount: number;
   reason: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | string;
   approvedBy?: string;
   appliedDate: string;
 }
@@ -136,6 +145,11 @@ export interface PendingAction {
   badgeType: 'success' | 'warning' | 'info';
   lastUpdated: string;
   actionText: string;
+  actionKind?: 'leave' | 'correction';
+  leaveType?: string;
+  daysCount?: number;
+  requestedCheckIn?: string;
+  requestedCheckOut?: string;
 }
 
 export interface Announcement {

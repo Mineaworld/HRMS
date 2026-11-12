@@ -185,44 +185,6 @@ export const getRoleBadge = (role: UserRole): RoleBadgeConfig => {
 };
 
 /**
- * Realistic demonstration personas for each role.
- */
-export interface RolePersona {
-  fullName: string;
-  email: string;
-  jobTitle: string;
-  avatarUrl: string;
-  employeeId: number;
-}
-
-export const ROLE_PERSONAS: Record<UserRole, RolePersona> = {
-  ROLE_ADMIN: {
-    fullName: 'Prasenjit Mondal',
-    email: 'prasenjit.mondal@abc.com',
-    jobTitle: 'Principal Lead Engineer & Administrator',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    employeeId: 1,
-  },
-  ROLE_HR: {
-    fullName: 'Sarah Jenkins',
-    email: 'sarah.jenkins@abc.com',
-    jobTitle: 'Senior HR Manager',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
-    employeeId: 3,
-  },
-  ROLE_EMPLOYEE: {
-    fullName: 'Sophea Chan',
-    email: 'sophea.chan@abc.com',
-    jobTitle: 'Frontend React Developer',
-    avatarUrl:
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
-    employeeId: 6,
-  },
-};
-
-/**
  * Gateway Route Contract Mapping
  * Documents the Spring Cloud Gateway filters and downstream service @PreAuthorize expressions.
  */
