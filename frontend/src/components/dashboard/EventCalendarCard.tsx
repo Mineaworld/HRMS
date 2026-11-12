@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { Calendar } from '../ui/calendar';
 import { CalendarDots, Sparkle } from '@phosphor-icons/react';
 import { useHrmsStore } from '../../store/useHrmsStore';
+import { useI18n } from '../../i18n/useI18n';
 
 export const EventCalendarCard: React.FC = () => {
   const { leaves } = useHrmsStore();
+  const { t, language } = useI18n();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(today);
 
   // Derive real event markers from company payroll schedule (28th) and real leaves
   const hasEventOnDate = (date: Date) => {
-    // Monthly payroll batch cadence
     if (date.getDate() === 28) return true;
 
     const y = date.getFullYear();
@@ -46,7 +47,7 @@ export const EventCalendarCard: React.FC = () => {
         <div className="flex items-center gap-2">
           <CalendarDots weight="duotone" className="w-4 h-4 text-blue-600" />
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-            Schedule & Events
+            {t('scheduleAndEvents')}
           </h2>
         </div>
         <span className="text-[10px] font-mono font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
@@ -73,31 +74,32 @@ export const EventCalendarCard: React.FC = () => {
       </div>
 
       {/* Footer Info */}
-      <div className="pt-2 border-t border-slate-100/90 flex items-center justify-between text-[11px]">
+      <div className="pt-2 border-t border-slate-100/90 flex items-center justify-between text-[11px] gap-2">
         <div className="text-slate-600 truncate">
           <span className="font-semibold text-slate-800">
             {selectedDate
-              ? selectedDate.toLocaleDateString(undefined, {
+              ? selectedDate.toLocaleDateString(language === 'kh' ? 'km-KH' : 'en-US', {
                   month: 'short',
                   day: 'numeric',
                   year: 'numeric',
                 })
-              : 'Select date'}
+              : t('selectDate')}
           </span>
           {leavesOnSelectedDate.length > 0 && (
             <span className="ml-1.5 text-blue-600 font-medium">
-              ({leavesOnSelectedDate.length} leave{leavesOnSelectedDate.length > 1 ? 's' : ''})
+              ({leavesOnSelectedDate.length}{' '}
+              {leavesOnSelectedDate.length > 1 ? t('leavePlural') : t('leaveSingular')})
             </span>
           )}
           {selectedDate?.getDate() === 28 && (
             <span className="ml-1.5 text-emerald-600 font-medium font-mono">
-              [Payroll Run]
+              {t('payrollRunTag')}
             </span>
           )}
         </div>
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
           <Sparkle weight="fill" className="w-2.5 h-2.5 text-emerald-600" />
-          <span>Operational</span>
+          <span>{t('operationalBadge')}</span>
         </span>
       </div>
     </div>

@@ -7,15 +7,17 @@ import {
   CalendarCheck,
   CurrencyDollar,
   ChartBar,
+  WarningCircle,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { BehavioralHistorySelect } from '../components/ui/behavioral-history-select';
+import { useI18n } from '../i18n/useI18n';
 
 interface CronJobSpec {
   jobName: string;
-  title: string;
-  shortTagline: string;
-  cadence: string;
+  titleKey: 'cronAttTitle' | 'cronContractTitle' | 'cronPayrollTitle' | 'cronWeeklyTitle';
+  taglineKey: 'cronAttTagline' | 'cronContractTagline' | 'cronPayrollTagline' | 'cronWeeklyTagline';
+  cadenceKey: 'cronAttCadence' | 'cronContractCadence' | 'cronPayrollCadence' | 'cronWeeklyCadence';
   schedule: string;
   icon: any;
 }
@@ -23,33 +25,33 @@ interface CronJobSpec {
 const CRON_JOBS: CronJobSpec[] = [
   {
     jobName: 'DailyAttendanceSyncJob',
-    title: 'Attendance Reconciler',
-    shortTagline: 'Reconciles daily logs & late cutoffs',
-    cadence: 'Daily 01:00 AM',
+    titleKey: 'cronAttTitle',
+    taglineKey: 'cronAttTagline',
+    cadenceKey: 'cronAttCadence',
     schedule: '0 0 1 * * ?',
     icon: Clock,
   },
   {
     jobName: 'ContractExpiryJob',
-    title: 'Contract Expiration',
-    shortTagline: 'Audits contracts expiring in 30 days',
-    cadence: 'Daily 08:00 AM',
+    titleKey: 'cronContractTitle',
+    taglineKey: 'cronContractTagline',
+    cadenceKey: 'cronContractCadence',
     schedule: '0 0 8 * * ?',
     icon: CalendarCheck,
   },
   {
     jobName: 'MonthlyPayrollJob',
-    title: 'Monthly Payroll',
-    shortTagline: 'Batch salary & deduction generator',
-    cadence: 'Monthly (28th)',
+    titleKey: 'cronPayrollTitle',
+    taglineKey: 'cronPayrollTagline',
+    cadenceKey: 'cronPayrollCadence',
     schedule: '0 0 0 28 * ?',
     icon: CurrencyDollar,
   },
   {
     jobName: 'WeeklyReportJob',
-    title: 'Weekly Analytics',
-    shortTagline: 'Workforce KPI & turnover aggregator',
-    cadence: 'Mondays 09:00 AM',
+    titleKey: 'cronWeeklyTitle',
+    taglineKey: 'cronWeeklyTagline',
+    cadenceKey: 'cronWeeklyCadence',
     schedule: '0 0 9 ? * MON',
     icon: ChartBar,
   },
@@ -57,64 +59,87 @@ const CRON_JOBS: CronJobSpec[] = [
 
 export const AutomationsPage: React.FC = () => {
   const { cronHistory, triggerCronJob, currentUser } = useHrmsStore();
+  const { t, tStatus } = useI18n();
   const [triggeringJob, setTriggeringJob] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedJobFilter, setSelectedJobFilter] = useState<string>('ALL');
 
   const isAdmin = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_HR';
 
-  const handleTrigger = (jobName: string, title: string) => {
+  const handleTrigger = async (jobName: string, title: string) => {
     setTriggeringJob(jobName);
     setToastMessage(null);
+    setErrorMessage(null);
 
-    setTimeout(() => {
-      triggerCronJob(jobName);
-      setTriggeringJob(null);
-      setToastMessage(`${title} executed successfully.`);
+    const res = await triggerCronJob(jobName);
+    setTriggeringJob(null);
 
-      setTimeout(() => setToastMessage(null), 3500);
-    }, 600);
+    if (!res.success) {
+      setErrorMessage(res.error || 'Failed to execute job.');
+      return;
+    }
+
+    setToastMessage(t('cronExecutedToast', { title }));
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const filteredHistory = selectedJobFilter === 'ALL'
-    ? cronHistory
-    : cronHistory.filter((h) => h.jobName === selectedJobFilter);
+  const filteredHistory =
+    selectedJobFilter === 'ALL'
+      ? cronHistory
+      : cronHistory.filter((h) => h.jobName === selectedJobFilter);
 
   return (
-    <div className="space-y-6 pb-12 animate-fadeIn select-none">
+    <div className="space-y-6 pb-12 select-none">
       {/* 1. Status Bar */}
       <div className="flex items-center justify-between gap-4 pb-1">
         <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-          Scheduled Tasks ({CRON_JOBS.length})
+          {t('scheduledTasksCount', { count: CRON_JOBS.length })}
         </span>
 
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-[11px] font-mono font-semibold text-emerald-700">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Daemon Active</span>
+          <span>{t('daemonActive')}</span>
         </span>
       </div>
 
-      {/* 2. Success Feedback Toast */}
+      {/* 2. Feedback Toasts */}
       {toastMessage && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between gap-3 animate-fadeIn">
+        <div
+          role="status"
+          aria-live="polite"
+          className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between gap-3 animate-fadeIn"
+        >
           <div className="flex items-center gap-2">
             <CheckCircle weight="fill" className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="font-semibold">{toastMessage}</span>
           </div>
-          <span className="font-mono text-[10px] text-emerald-600">Dispatched</span>
+          <span className="font-mono text-[10px] text-emerald-600">{t('dispatched')}</span>
         </div>
       )}
 
-      {/* 3. Scheduled Jobs Grid (Base Web UI: Minimal text, high visual hierarchy) */}
+      {errorMessage && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2 animate-fadeIn"
+        >
+          <WarningCircle weight="fill" className="w-4 h-4 text-rose-500 shrink-0" />
+          <span className="font-medium">{errorMessage}</span>
+        </div>
+      )}
+
+      {/* 3. Scheduled Jobs Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {CRON_JOBS.map((job) => {
           const Icon = job.icon;
           const isRunning = triggeringJob === job.jobName;
+          const jobTitle = t(job.titleKey);
 
           return (
             <div
               key={job.jobName}
-              className="rounded-2xl bg-white p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-all duration-150 min-h-[165px]"
+              className="rounded-2xl bg-white p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition-[box-shadow,border-color] duration-150 min-h-[165px]"
             >
               <div>
                 <div className="flex items-center justify-between gap-2">
@@ -122,15 +147,15 @@ export const AutomationsPage: React.FC = () => {
                     <Icon weight="duotone" className="w-5 h-5" />
                   </div>
                   <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                    {job.cadence}
+                    {t(job.cadenceKey)}
                   </span>
                 </div>
 
                 <h3 className="text-sm font-bold text-slate-900 mt-3 tracking-tight">
-                  {job.title}
+                  {jobTitle}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 line-clamp-1">
-                  {job.shortTagline}
+                  {t(job.taglineKey)}
                 </p>
               </div>
 
@@ -141,20 +166,21 @@ export const AutomationsPage: React.FC = () => {
 
                 {isAdmin && (
                   <button
-                    onClick={() => handleTrigger(job.jobName, job.title)}
+                    type="button"
+                    onClick={() => handleTrigger(job.jobName, jobTitle)}
                     disabled={isRunning}
-                    aria-label={`Run ${job.title}`}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.96] text-white text-xs font-semibold shadow-2xs transition-transform duration-100 disabled:opacity-50 cursor-pointer"
+                    aria-label={`${t('runBtn')} ${jobTitle}`}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.96] text-white text-xs font-semibold shadow-2xs transition-[transform,background-color] duration-100 disabled:opacity-50 cursor-pointer"
                   >
                     {isRunning ? (
                       <>
                         <CircleNotch weight="bold" className="w-3.5 h-3.5 animate-spin" />
-                        <span>Running</span>
+                        <span>{t('runningText')}</span>
                       </>
                     ) : (
                       <>
                         <Play weight="fill" className="w-3 h-3 text-emerald-400" />
-                        <span>Run</span>
+                        <span>{t('runBtn')}</span>
                       </>
                     )}
                   </button>
@@ -165,27 +191,27 @@ export const AutomationsPage: React.FC = () => {
         })}
       </div>
 
-      {/* 4. Execution History Table (Clean Base Web style: 5 high-signal columns, zero redundant telemetry) */}
+      {/* 4. Execution History Table */}
       <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">Execution History</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Recent automated and manual job dispatches
-            </p>
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+              {t('executionHistory')}
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">{t('executionHistorySub')}</p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Filter:</span>
+            <span className="text-xs text-slate-400 font-medium">{t('filterLabel')}</span>
             <BehavioralHistorySelect
               selectWidth="200px"
               value={selectedJobFilter}
               onChange={(val) => setSelectedJobFilter(val)}
               options={[
-                { value: 'ALL', label: 'All Jobs' },
+                { value: 'ALL', label: t('allJobs') },
                 ...CRON_JOBS.map((j) => ({
                   value: j.jobName,
-                  label: j.title,
+                  label: t(j.titleKey),
                 })),
               ]}
               storageKey="hrms_cron_filter_history"
@@ -193,23 +219,22 @@ export const AutomationsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-400 uppercase font-semibold text-[10px] tracking-wider">
               <tr>
-                <th className="px-6 py-3">Job</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Timestamp</th>
-                <th className="px-6 py-3">Duration</th>
-                <th className="px-6 py-3 text-right">Trigger</th>
+                <th className="px-6 py-3">{t('colJob')}</th>
+                <th className="px-6 py-3">{t('colStatus')}</th>
+                <th className="px-6 py-3">{t('colTimestamp')}</th>
+                <th className="px-6 py-3">{t('colJobDuration')}</th>
+                <th className="px-6 py-3 text-right">{t('colTrigger')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredHistory.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
-                    No executions recorded.
+                    {t('noExecutions')}
                   </td>
                 </tr>
               ) : (
@@ -221,12 +246,12 @@ export const AutomationsPage: React.FC = () => {
                     <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-3.5">
                         <span className="font-bold text-slate-900">
-                          {jobSpec?.title || item.jobName}
+                          {jobSpec ? t(jobSpec.titleKey) : item.jobName}
                         </span>
                       </td>
                       <td className="px-6 py-3.5">
                         <span
-                          className={`inline-flex items-center gap-1.5 font-mono font-bold text-[10px] px-2.5 py-0.5 rounded-full border ${
+                          className={`inline-flex items-center gap-1.5 font-semibold text-[11px] px-2.5 py-0.5 rounded-full border ${
                             isSuccess
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                               : 'bg-rose-50 text-rose-700 border-rose-200/80'
@@ -237,17 +262,19 @@ export const AutomationsPage: React.FC = () => {
                               isSuccess ? 'bg-emerald-500' : 'bg-rose-500'
                             }`}
                           />
-                          <span>{item.status}</span>
+                          <span>{tStatus(item.status)}</span>
                         </span>
                       </td>
-                      <td className="px-6 py-3.5 font-mono text-slate-500 text-[11px] whitespace-nowrap">
+                      <td className="px-6 py-3.5 font-mono text-slate-500 text-[11px] whitespace-nowrap tabular-nums">
                         {item.executionTime}
                       </td>
-                      <td className="px-6 py-3.5 font-mono text-slate-600 text-[11px]">
+                      <td className="px-6 py-3.5 font-mono text-slate-600 text-[11px] tabular-nums">
                         {item.durationMs}ms
                       </td>
                       <td className="px-6 py-3.5 text-right font-mono text-[10px] text-slate-400">
-                        {item.triggeredBy === 'CRON_SCHEDULER' ? 'Scheduled' : item.triggeredBy}
+                        {item.triggeredBy === 'CRON_SCHEDULER'
+                          ? t('scheduledTrigger')
+                          : item.triggeredBy}
                       </td>
                     </tr>
                   );

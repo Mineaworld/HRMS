@@ -16,6 +16,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
 import { getRoleBadge, isRoleAllowedForTab } from '../../utils/rbac';
+import { useI18n } from '../../i18n/useI18n';
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -24,43 +25,45 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse }) => {
   const { activeTab, setActiveTab, currentUser, syncWithGateway, logout } = useHrmsStore();
+  const { t, tRole } = useI18n();
   const isEmployee = currentUser.role === 'ROLE_EMPLOYEE';
   const roleBadge = getRoleBadge(currentUser.role);
+  const roleInfo = tRole(currentUser.role);
 
   const baseNavItems = [
-    { id: 'dashboard' as NavTab, label: 'Dashboard', icon: SquaresFour },
+    { id: 'dashboard' as NavTab, label: t('navDashboard'), icon: SquaresFour },
     {
       id: 'attendance' as NavTab,
-      label: isEmployee ? 'My Attendance' : 'Attendance & Time',
+      label: isEmployee ? t('navMyAttendance') : t('navAttendance'),
       icon: Clock,
     },
     {
       id: 'employees' as NavTab,
-      label: isEmployee ? 'Staff Directory' : 'Employees',
+      label: isEmployee ? t('navStaffDirectory') : t('navEmployees'),
       icon: UsersThree,
     },
     {
       id: 'departments' as NavTab,
-      label: 'Organization',
+      label: t('navOrganization'),
       icon: Buildings,
     },
     {
       id: 'automations' as NavTab,
-      label: 'Automations',
+      label: t('navAutomations'),
       icon: Cpu,
     },
     {
       id: 'leaves' as NavTab,
-      label: isEmployee ? 'My Leaves' : 'Leave Management',
+      label: isEmployee ? t('navMyLeaves') : t('navLeaves'),
       icon: CalendarCheck,
     },
     {
       id: 'payroll' as NavTab,
-      label: isEmployee ? 'My Payslips' : 'Payroll & Salary',
+      label: isEmployee ? t('navMyPayslips') : t('navPayroll'),
       icon: CurrencyDollar,
     },
-    { id: 'reports' as NavTab, label: 'Analytics', icon: ChartBar },
-    { id: 'profile' as NavTab, label: 'My Account', icon: UserCircle },
+    { id: 'reports' as NavTab, label: t('navReports'), icon: ChartBar },
+    { id: 'profile' as NavTab, label: t('navProfile'), icon: UserCircle },
   ];
 
   const navItems = baseNavItems.filter((item) => isRoleAllowedForTab(currentUser.role, item.id));
@@ -91,19 +94,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
             {!isCollapsed && (
               <div className="min-w-0">
                 <span className="text-sm font-bold tracking-tight text-slate-900 block leading-tight">
-                  BigBoss
+                  {t('brandName')}
                 </span>
                 <span className="text-[10px] font-medium text-slate-400 block tracking-tight">
-                  HR Management
+                  {t('brandHrMgmt')}
                 </span>
               </div>
             )}
           </div>
           <button
+            type="button"
             onClick={onToggleCollapse}
-            aria-label={isCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-            title={isCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            aria-label={isCollapsed ? t('expandNav') : t('collapseNav')}
+            title={isCollapsed ? t('expandNav') : t('collapseNav')}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
           >
             <CaretLeft
               weight="bold"
@@ -116,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
         <div className={isCollapsed ? 'px-0 mb-2' : 'px-2 mb-2'}>
           {!isCollapsed && (
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-2 px-1">
-              Platform
+              {t('platform')}
             </span>
           )}
           <nav className={isCollapsed ? 'space-y-1' : 'space-y-1.5'} aria-label="Main Navigation">
@@ -127,11 +131,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
               return (
                 <div key={item.id} className="flex justify-center">
                   <button
+                    type="button"
                     onClick={() => setActiveTab(item.id)}
                     aria-label={item.label}
                     title={isCollapsed ? item.label : undefined}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex items-center active:scale-[0.96] transition-colors duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                    className={`flex items-center active:scale-[0.96] transition-[transform,background-color,color] duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                       isCollapsed
                         ? 'w-10 h-10 rounded-xl justify-center'
                         : 'w-full gap-3 px-3 py-2.5 rounded-xl text-xs font-medium'
@@ -186,7 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
               <div className="flex items-center gap-1 mt-0.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${roleBadge.dotClass}`} />
                 <span className="text-[10px] font-mono font-medium text-slate-500 uppercase tracking-tight">
-                  {roleBadge.shortTag}
+                  {roleInfo.shortTag}
                 </span>
               </div>
             </div>
@@ -196,10 +201,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
         {isCollapsed && (
           <div className="mt-2 pt-2 border-t border-slate-200/60 flex justify-center w-full">
             <button
+              type="button"
               onClick={logout}
-              aria-label="Sign out"
-              title="Sign out"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+              aria-label={t('signOut')}
+              title={t('signOut')}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
             >
               <SignOut weight="bold" className="w-4 h-4" />
             </button>
@@ -209,19 +215,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse 
         {!isCollapsed && (
           <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between px-1 w-full">
             <button
+              type="button"
               onClick={logout}
-              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-rose-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
+              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-rose-600 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded px-1 py-0.5 cursor-pointer"
             >
               <SignOut weight="bold" className="w-3.5 h-3.5" />
-              <span>Sign out</span>
+              <span>{t('signOut')}</span>
             </button>
             <button
+              type="button"
               onClick={() => syncWithGateway()}
-              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
-              title="Sync state with API Gateway"
+              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded px-1 py-0.5 cursor-pointer"
+              title={t('syncTooltip')}
             >
               <ArrowsClockwise weight="bold" className="w-3.5 h-3.5" />
-              <span>Sync</span>
+              <span>{t('syncBtn')}</span>
             </button>
           </div>
         )}

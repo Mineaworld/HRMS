@@ -10,11 +10,13 @@ import {
   ClockCountdown,
   ShieldCheck,
   PencilSimple,
+  CircleNotch,
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { hasPermission } from '../utils/rbac';
 import { AttendanceRecord } from '../types';
 import { Modal, Drawer } from '../components/ui/modal';
+import { useI18n } from '../i18n/useI18n';
 
 export const AttendancePage: React.FC = () => {
   const {
@@ -26,6 +28,7 @@ export const AttendancePage: React.FC = () => {
     requestAttendanceCorrection,
     reviewAttendanceCorrection,
   } = useHrmsStore();
+  const { t, tStatus, language } = useI18n();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Modal / Drawer state
@@ -34,16 +37,20 @@ export const AttendancePage: React.FC = () => {
   const [targetRecordForCorrection, setTargetRecordForCorrection] = useState<AttendanceRecord | null>(null);
 
   // Form State
-  const [reqCheckIn, setReqCheckIn] = useState('08:00 AM');
-  const [reqCheckOut, setReqCheckOut] = useState('05:00 PM');
-  const [reqReason, setReqReason] = useState('Biometric reader fault at reception entrance');
+  const [reqCheckIn, setReqCheckIn] = useState('08:00');
+  const [reqCheckOut, setReqCheckOut] = useState('17:00');
+  const [reqReason, setReqReason] = useState('');
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isPunching, setIsPunching] = useState(false);
 
   const canViewAll = hasPermission(currentUser.role, 'ATTENDANCE_VIEW_ALL');
+  const canRequestCorrection = hasPermission(currentUser.role, 'ATTENDANCE_CORRECTION_REQUEST');
   const isManager = currentUser.role === 'ROLE_ADMIN' || currentUser.role === 'ROLE_HR';
   const myEmployeeId = currentUser.employeeId || 1;
 
-  // Pending count for managers
   const pendingCorrections = attendanceCorrections.filter((c) => c.status === 'PENDING');
 
   // Live Clock effect
@@ -52,7 +59,7 @@ export const AttendancePage: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const todayStr = currentTime.toISOString().split('T')[0];
+  const todayStr = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, '0')}-${String(currentTime.getDate()).padStart(2, '0')}`;
   const myRecordToday = attendance.find(
     (a) => a.employeeId === myEmployeeId && a.attendanceDate === todayStr
   );
@@ -60,97 +67,140 @@ export const AttendancePage: React.FC = () => {
   const isCheckedIn = Boolean(myRecordToday?.checkIn);
   const isCheckedOut = Boolean(myRecordToday?.checkOut);
 
-  // Scoped attendance records
   const displayedAttendance = canViewAll
     ? attendance
     : attendance.filter((a) => a.employeeId === myEmployeeId);
 
-  // Metrics (Company-wide for Admin/HR vs Personal for Employee)
+  const isStatus = (status: string | undefined, target: string) =>
+    status?.toUpperCase().replace(/\s+/g, '_') === target;
+
   const presentCount = canViewAll
-    ? attendance.filter((a) => a.status === 'PRESENT').length
-    : displayedAttendance.filter((a) => a.status === 'PRESENT').length;
+    ? attendance.filter((a) => isStatus(a.status, 'PRESENT')).length
+    : displayedAttendance.filter((a) => isStatus(a.status, 'PRESENT')).length;
 
   const lateCount = canViewAll
-    ? attendance.filter((a) => a.status === 'LATE').length
-    : displayedAttendance.filter((a) => a.status === 'LATE').length;
+    ? attendance.filter((a) => isStatus(a.status, 'LATE')).length
+    : displayedAttendance.filter((a) => isStatus(a.status, 'LATE')).length;
 
   const onLeaveCount = canViewAll
-    ? attendance.filter((a) => a.status === 'ON_LEAVE').length
-    : displayedAttendance.filter((a) => a.status === 'ON_LEAVE').length;
+    ? attendance.filter((a) => isStatus(a.status, 'ON_LEAVE')).length
+    : displayedAttendance.filter((a) => isStatus(a.status, 'ON_LEAVE')).length;
 
   const totalOtHours = canViewAll
     ? attendance.reduce((sum, a) => sum + (a.otHours || 0), 0)
     : displayedAttendance.reduce((sum, a) => sum + (a.otHours || 0), 0);
+
+  const handleCheckIn = async () => {
+    setIsPunching(true);
+    setErrorMessage(null);
+    const res = await checkInToday(currentUser.employeeId || 1);
+    setIsPunching(false);
+    if (!res.success && res.error) {
+      setErrorMessage(res.error);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    setIsPunching(true);
+    setErrorMessage(null);
+    const res = await checkOutToday(currentUser.employeeId || 1);
+    setIsPunching(false);
+    if (!res.success && res.error) {
+      setErrorMessage(res.error);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-12">
       {/* 1. Punch Station Card */}
       <div className="bg-white/90 backdrop-blur-md rounded-2xl p-6 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          {/* Live Clock Display */}
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-600 mb-1">
               <Clock weight="fill" className="w-4 h-4" />
-              <span>Real-Time Attendance Punch Station</span>
+              <span>{t('punchStationTitle')}</span>
             </div>
             <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums">
-              {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {currentTime.toLocaleTimeString(language === 'kh' ? 'km-KH' : 'en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              {currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              <span className="ml-2 text-slate-400">| Standard Workday: 08:00 - 17:00 (15m grace)</span>
+              {currentTime.toLocaleDateString(language === 'kh' ? 'km-KH' : 'en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+              <span className="ml-2 text-slate-400">| {t('standardWorkdayNote')}</span>
             </div>
           </div>
 
-          {/* Punch Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => checkInToday(currentUser.employeeId || 1)}
-              disabled={isCheckedIn}
-              aria-label="Check in for today"
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+              type="button"
+              onClick={handleCheckIn}
+              disabled={isCheckedIn || isPunching}
+              aria-label={t('checkInNow')}
+              className={`flex items-center gap-2 min-h-[42px] px-5 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color,color] duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                 isCheckedIn
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 hover:scale-[1.02]'
+                  : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.97] text-white shadow-blue-500/20 cursor-pointer'
               }`}
             >
-              {isCheckedIn ? (
+              {isPunching && !isCheckedIn ? (
+                <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
+              ) : isCheckedIn ? (
                 <>
                   <CheckCircle weight="fill" className="w-4 h-4 text-emerald-600" />
-                  <span>Checked In ({myRecordToday?.checkIn})</span>
+                  <span>{t('checkedInAt', { time: myRecordToday?.checkIn || '' })}</span>
                 </>
               ) : (
                 <>
                   <SignIn weight="bold" className="w-4 h-4" />
-                  <span>Check In Now</span>
+                  <span>{t('checkInNow')}</span>
                 </>
               )}
             </button>
 
             <button
-              onClick={() => checkOutToday(currentUser.employeeId || 1)}
-              disabled={!isCheckedIn || isCheckedOut}
-              aria-label="Check out for today"
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold transition-all duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
-                isCheckedOut
-                  ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                  : !isCheckedIn
+              type="button"
+              onClick={handleCheckOut}
+              disabled={!isCheckedIn || isCheckedOut || isPunching}
+              aria-label={t('checkOut')}
+              className={`flex items-center gap-2 min-h-[42px] px-5 py-2.5 rounded-xl text-xs font-bold transition-[transform,background-color,color] duration-150 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
+                isCheckedOut || !isCheckedIn
                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  : 'bg-slate-900 hover:bg-slate-800 text-white hover:scale-[1.02]'
+                  : 'bg-slate-900 hover:bg-slate-800 active:scale-[0.97] text-white cursor-pointer'
               }`}
             >
               <SignOut weight="bold" className="w-4 h-4" />
               <span>
-                {isCheckedOut ? `Checked Out (${myRecordToday?.checkOut})` : 'Check Out'}
+                {isCheckedOut
+                  ? t('checkedOutAt', { time: myRecordToday?.checkOut || '' })
+                  : t('checkOut')}
               </span>
             </button>
           </div>
         </div>
 
+        {errorMessage && (
+          <div
+            role="alert"
+            aria-live="polite"
+            className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2 animate-fadeIn"
+          >
+            <WarningCircle weight="fill" className="w-4 h-4 text-rose-500 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         {/* Current Punch State Banner */}
         {myRecordToday && (
-          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-4 text-xs">
-            <span className="font-semibold text-slate-700">Today's Status:</span>
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4 text-xs">
+            <span className="font-semibold text-slate-700">{t('todaysStatus')}</span>
             <span
               className={`px-2.5 py-0.5 rounded-full font-bold ${
                 myRecordToday.status === 'PRESENT'
@@ -160,17 +210,17 @@ export const AttendancePage: React.FC = () => {
                   : 'bg-rose-50 text-rose-600'
               }`}
             >
-              {myRecordToday.status}
+              {tStatus(myRecordToday.status)}
             </span>
             {myRecordToday.lateMinutes > 0 && (
               <span className="text-amber-600 font-medium flex items-center gap-1">
                 <WarningCircle weight="bold" className="w-3.5 h-3.5" />
-                Late by {myRecordToday.lateMinutes} minutes
+                {t('lateByMinutes', { mins: myRecordToday.lateMinutes })}
               </span>
             )}
             {myRecordToday.otHours > 0 && (
               <span className="text-blue-600 font-medium">
-                Overtime: +{myRecordToday.otHours} hrs
+                {t('overtimeHours', { hrs: myRecordToday.otHours })}
               </span>
             )}
           </div>
@@ -179,8 +229,7 @@ export const AttendancePage: React.FC = () => {
 
       {/* 2. Attendance Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Present */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-shadow duration-150 flex flex-col justify-between min-h-[118px]">
           <div className="flex items-start justify-between">
             <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
               {presentCount}
@@ -191,16 +240,15 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              {canViewAll ? 'Present Today' : 'My Days Present'}
+              {canViewAll ? t('attPresentToday') : t('attMyDaysPresent')}
             </h3>
             <p className="text-[11px] text-emerald-600 mt-0.5 leading-tight font-medium">
-              {canViewAll ? 'Checked-in workforce' : 'Personal on-time records'}
+              {canViewAll ? t('attCheckedInWorkforce') : t('attPersonalOnTime')}
             </p>
           </div>
         </div>
 
-        {/* Late */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-shadow duration-150 flex flex-col justify-between min-h-[118px]">
           <div className="flex items-start justify-between">
             <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
               {lateCount}
@@ -211,16 +259,15 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              {canViewAll ? 'Late Arrivals' : 'My Late Arrivals'}
+              {canViewAll ? t('attLateArrivals') : t('attMyLateArrivals')}
             </h3>
             <p className="text-[11px] text-amber-600 mt-0.5 leading-tight font-medium">
-              {canViewAll ? 'Grace period exceeded' : 'Past 08:15 AM threshold'}
+              {canViewAll ? t('attGraceExceeded') : t('attPastThreshold')}
             </p>
           </div>
         </div>
 
-        {/* On Leave */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-shadow duration-150 flex flex-col justify-between min-h-[118px]">
           <div className="flex items-start justify-between">
             <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
               {onLeaveCount}
@@ -231,16 +278,15 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              {canViewAll ? 'Approved Leave' : 'My Leaves Taken'}
+              {canViewAll ? t('attApprovedLeave') : t('attMyLeavesTaken')}
             </h3>
             <p className="text-[11px] text-cyan-600 mt-0.5 leading-tight font-medium">
-              {canViewAll ? 'Planned company absence' : 'Excused time off'}
+              {canViewAll ? t('attPlannedAbsence') : t('attExcusedTimeOff')}
             </p>
           </div>
         </div>
 
-        {/* Overtime */}
-        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all flex flex-col justify-between min-h-[118px]">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-shadow duration-150 flex flex-col justify-between min-h-[118px]">
           <div className="flex items-start justify-between">
             <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">
               {totalOtHours}h
@@ -251,10 +297,10 @@ export const AttendancePage: React.FC = () => {
           </div>
           <div className="mt-4">
             <h3 className="text-xs font-bold text-slate-800 tracking-tight leading-snug">
-              {canViewAll ? 'Overtime Hours' : 'My Overtime'}
+              {canViewAll ? t('attOvertimeHours') : t('attMyOvertime')}
             </h3>
             <p className="text-[11px] text-purple-600 mt-0.5 leading-tight font-medium">
-              {canViewAll ? 'Logged company excess' : 'Eligible for OT pay'}
+              {canViewAll ? t('attLoggedExcess') : t('attEligibleOt')}
             </p>
           </div>
         </div>
@@ -262,27 +308,30 @@ export const AttendancePage: React.FC = () => {
 
       {/* 3. Attendance Daily Logs Table */}
       <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CalendarCheck weight="duotone" className="w-5 h-5 text-blue-600" />
+            <CalendarCheck weight="duotone" className="w-5 h-5 text-blue-600 shrink-0" />
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                {canViewAll ? 'Daily Attendance Records' : 'My Attendance History'}
+                {canViewAll ? t('attDailyRecords') : t('attMyHistory')}
               </h2>
               <p className="text-[10px] text-slate-400">
-                {canViewAll ? 'Full enterprise attendance audit log' : `Viewing records for ${currentUser.fullName}`}
+                {canViewAll
+                  ? t('attFullAuditLog')
+                  : t('attViewingRecordsFor', { name: currentUser.fullName })}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {isManager && (
               <button
+                type="button"
                 onClick={() => setIsQueueDrawerOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 text-xs font-semibold active:scale-[0.98] transition-all"
+                className="flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 text-xs font-semibold active:scale-[0.98] transition-[transform,background-color] cursor-pointer"
               >
                 <ShieldCheck weight="bold" className="w-3.5 h-3.5 text-blue-400" />
-                <span>Corrections Queue</span>
+                <span>{t('correctionsQueue')}</span>
                 {pendingCorrections.length > 0 && (
                   <span className="ml-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-mono">
                     {pendingCorrections.length}
@@ -291,28 +340,37 @@ export const AttendancePage: React.FC = () => {
               </button>
             )}
 
-            <button
-              onClick={() => {
-                const target = displayedAttendance[0] || null;
-                setTargetRecordForCorrection(target);
-                setIsCorrectionModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-            >
-              <PencilSimple weight="bold" className="w-3.5 h-3.5" />
-              <span>Request Correction</span>
-            </button>
+            {canRequestCorrection && (
+              <button
+                type="button"
+                onClick={() => {
+                  const target = displayedAttendance[0] || null;
+                  setTargetRecordForCorrection(target);
+                  setCorrectionError(null);
+                  setIsCorrectionModalOpen(true);
+                }}
+                disabled={displayedAttendance.length === 0}
+                className="flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none disabled:opacity-50 cursor-pointer"
+              >
+                <PencilSimple weight="bold" className="w-3.5 h-3.5" />
+                <span>{t('requestCorrection')}</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Toast */}
         {toastMessage && (
-          <div className="p-3 mx-6 mt-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between animate-fadeIn">
+          <div
+            role="status"
+            aria-live="polite"
+            className="p-3 mx-6 mt-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between animate-fadeIn"
+          >
             <div className="flex items-center gap-2">
               <CheckCircle weight="fill" className="w-4 h-4 text-emerald-600 flex-shrink-0" />
               <span className="font-medium">{toastMessage}</span>
             </div>
-            <span className="font-mono text-[10px] text-emerald-600">Audit Synchronized</span>
+            <span className="font-mono text-[10px] text-emerald-600">{t('auditSynchronized')}</span>
           </div>
         )}
 
@@ -320,71 +378,86 @@ export const AttendancePage: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                <th className="py-3 px-6">Employee</th>
-                <th className="py-3 px-6">Date</th>
-                <th className="py-3 px-6">Check In</th>
-                <th className="py-3 px-6">Check Out</th>
-                <th className="py-3 px-6">Late Minutes</th>
-                <th className="py-3 px-6">OT Hours</th>
-                <th className="py-3 px-6">Status</th>
-                <th className="py-3 px-6 text-right">Action</th>
+                <th className="py-3 px-6">{t('colEmployee')}</th>
+                <th className="py-3 px-6">{t('colDate')}</th>
+                <th className="py-3 px-6">{t('colCheckIn')}</th>
+                <th className="py-3 px-6">{t('colCheckOut')}</th>
+                <th className="py-3 px-6">{t('colLateMinutes')}</th>
+                <th className="py-3 px-6">{t('colOtHours')}</th>
+                <th className="py-3 px-6">{t('colStatus')}</th>
+                {canRequestCorrection && <th className="py-3 px-6 text-right">{t('colAction')}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-              {displayedAttendance.map((rec) => (
-                <tr key={rec.attendanceId} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3.5 px-6 font-semibold text-slate-900">
-                    {rec.employeeName}
-                  </td>
-                  <td className="py-3.5 px-6 font-mono text-slate-500 text-[11px]">
-                    {rec.attendanceDate}
-                  </td>
-                  <td className="py-3.5 px-6 font-mono font-medium text-slate-800">
-                    {rec.checkIn || '—'}
-                  </td>
-                  <td className="py-3.5 px-6 font-mono font-medium text-slate-800">
-                    {rec.checkOut || '—'}
-                  </td>
-                  <td className="py-3.5 px-6">
-                    {rec.lateMinutes > 0 ? (
-                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold border border-amber-200/60">
-                        +{rec.lateMinutes} mins
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">On Time</span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-6 font-mono">
-                    {rec.otHours > 0 ? `${rec.otHours} hrs` : '0'}
-                  </td>
-                  <td className="py-3.5 px-6">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                        rec.status === 'PRESENT'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                          : rec.status === 'LATE'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
-                          : rec.status === 'ON_LEAVE'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                      }`}
-                    >
-                      {rec.status}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-6 text-right">
-                    <button
-                      onClick={() => {
-                        setTargetRecordForCorrection(rec);
-                        setIsCorrectionModalOpen(true);
-                      }}
-                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 underline active:scale-[0.98]"
-                    >
-                      Dispute
-                    </button>
+              {displayedAttendance.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-10 px-6 text-center text-slate-400">
+                    {t('noAttendanceRows')}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                displayedAttendance.map((rec) => (
+                  <tr key={rec.attendanceId} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="py-3.5 px-6 font-semibold text-slate-900">
+                      {rec.employeeName}
+                    </td>
+                    <td className="py-3.5 px-6 font-mono text-slate-500 text-[11px] tabular-nums">
+                      {rec.attendanceDate}
+                    </td>
+                    <td className="py-3.5 px-6 font-mono font-medium text-slate-800 tabular-nums">
+                      {rec.checkIn || '—'}
+                    </td>
+                    <td className="py-3.5 px-6 font-mono font-medium text-slate-800 tabular-nums">
+                      {rec.checkOut || '—'}
+                    </td>
+                    <td className="py-3.5 px-6">
+                      {rec.lateMinutes > 0 ? (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold border border-amber-200/60">
+                          +{rec.lateMinutes} {t('minsUnit')}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">{t('onTimeText')}</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-6 font-mono tabular-nums">
+                      {rec.otHours > 0 ? `${rec.otHours} ${t('hrsUnit')}` : '0'}
+                    </td>
+                    <td className="py-3.5 px-6">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                          rec.status === 'PRESENT'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                            : rec.status === 'LATE'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                            : rec.status === 'ON_LEAVE'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                        }`}
+                      >
+                        {tStatus(rec.status)}
+                      </span>
+                    </td>
+                    {canRequestCorrection && (
+                      <td className="py-3.5 px-6 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetRecordForCorrection(rec);
+                            setReqCheckIn(rec.checkIn || '08:00');
+                            setReqCheckOut(rec.checkOut || '17:00');
+                            setReqReason('');
+                            setCorrectionError(null);
+                            setIsCorrectionModalOpen(true);
+                          }}
+                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 underline active:scale-[0.98] cursor-pointer"
+                        >
+                          {t('disputeBtn')}
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -394,16 +467,18 @@ export const AttendancePage: React.FC = () => {
       <Modal
         isOpen={isCorrectionModalOpen}
         onClose={() => setIsCorrectionModalOpen(false)}
-        title="Request Punch Correction"
-        subtitle="Submits to operation_service (/api/attendance/corrections)"
+        title={t('modalCorrectionTitle')}
+        subtitle={t('modalCorrectionSub')}
         maxWidth="md"
       >
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (!targetRecordForCorrection) return;
 
-            requestAttendanceCorrection({
+            setIsSubmittingCorrection(true);
+            setCorrectionError(null);
+            const res = await requestAttendanceCorrection({
               attendanceId: targetRecordForCorrection.attendanceId,
               employeeId: targetRecordForCorrection.employeeId,
               employeeName: targetRecordForCorrection.employeeName,
@@ -414,60 +489,81 @@ export const AttendancePage: React.FC = () => {
               requestedCheckOut: reqCheckOut,
               reason: reqReason,
             });
+            setIsSubmittingCorrection(false);
+
+            if (!res.success && res.error) {
+              setCorrectionError(res.error);
+              return;
+            }
 
             setIsCorrectionModalOpen(false);
-            setToastMessage('Correction request submitted for manager review.');
+            setToastMessage(t('correctionSubmittedToast'));
             setTimeout(() => setToastMessage(null), 4000);
           }}
           className="space-y-3.5"
         >
+          {correctionError && (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2"
+            >
+              <WarningCircle weight="fill" className="w-4 h-4 text-rose-500 shrink-0" />
+              <span>{correctionError}</span>
+            </div>
+          )}
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
             <div className="font-semibold text-slate-800">
               {targetRecordForCorrection?.employeeName} • {targetRecordForCorrection?.attendanceDate}
             </div>
             <div className="text-[11px] text-slate-500 mt-0.5 font-mono">
-              Current: In {targetRecordForCorrection?.checkIn || 'None'} / Out{' '}
-              {targetRecordForCorrection?.checkOut || 'None'}
+              {t('currentPunchPrefix', {
+                inTime: targetRecordForCorrection?.checkIn || '—',
+                outTime: targetRecordForCorrection?.checkOut || '—',
+              })}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Corrected Check-In
+              <label htmlFor="corrCheckIn" className="block text-xs font-semibold text-slate-700 mb-1">
+                {t('correctedCheckInLabel')}
               </label>
               <input
+                id="corrCheckIn"
                 type="text"
                 value={reqCheckIn}
                 onChange={(e) => setReqCheckIn(e.target.value)}
                 required
-                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                className="w-full px-3 py-2 text-sm sm:text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Corrected Check-Out
+              <label htmlFor="corrCheckOut" className="block text-xs font-semibold text-slate-700 mb-1">
+                {t('correctedCheckOutLabel')}
               </label>
               <input
+                id="corrCheckOut"
                 type="text"
                 value={reqCheckOut}
                 onChange={(e) => setReqCheckOut(e.target.value)}
                 required
-                className="w-full px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+                className="w-full px-3 py-2 text-sm sm:text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Reason for Adjustment
+            <label htmlFor="corrReason" className="block text-xs font-semibold text-slate-700 mb-1">
+              {t('reasonAdjustmentLabel')}
             </label>
             <textarea
+              id="corrReason"
               value={reqReason}
               onChange={(e) => setReqReason(e.target.value)}
               rows={2}
               required
-              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none"
+              className="w-full px-3 py-2 text-sm sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500"
             />
           </div>
 
@@ -475,15 +571,23 @@ export const AttendancePage: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsCorrectionModalOpen(false)}
-              className="px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+              className="min-h-[38px] px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold active:scale-[0.98] transition-all"
+              disabled={isSubmittingCorrection}
+              className="inline-flex items-center gap-2 min-h-[38px] px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold active:scale-[0.98] transition-[transform,background-color] disabled:opacity-60 cursor-pointer"
             >
-              Submit Request
+              {isSubmittingCorrection ? (
+                <>
+                  <CircleNotch weight="bold" className="w-3.5 h-3.5 animate-spin" />
+                  <span>{t('saving')}</span>
+                </>
+              ) : (
+                <span>{t('submitRequestBtn')}</span>
+              )}
             </button>
           </div>
         </form>
@@ -493,15 +597,15 @@ export const AttendancePage: React.FC = () => {
       <Drawer
         isOpen={isQueueDrawerOpen}
         onClose={() => setIsQueueDrawerOpen(false)}
-        title="Corrections Queue"
-        subtitle="Review and approve employee attendance adjustment disputes"
+        title={t('drawerQueueTitle')}
+        subtitle={t('drawerQueueSub')}
         width="md"
       >
         <div className="space-y-4">
           <div className="space-y-3 max-h-[65vh] overflow-y-auto">
             {attendanceCorrections.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400">
-                No correction requests submitted.
+                {t('noCorrectionRequests')}
               </div>
             ) : (
               attendanceCorrections.map((corr) => (
@@ -514,7 +618,7 @@ export const AttendancePage: React.FC = () => {
                       {corr.employeeName}
                     </span>
                     <span
-                      className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         corr.status === 'APPROVED'
                           ? 'bg-emerald-50 text-emerald-700'
                           : corr.status === 'REJECTED'
@@ -522,13 +626,16 @@ export const AttendancePage: React.FC = () => {
                           : 'bg-amber-50 text-amber-700'
                       }`}
                     >
-                      {corr.status}
+                      {tStatus(corr.status)}
                     </span>
                   </div>
 
                   <div className="text-[11px] text-slate-500 font-mono">
-                    Date: {corr.attendanceDate} • Requested: In {corr.requestedCheckIn} / Out{' '}
-                    {corr.requestedCheckOut}
+                    {t('requestedInOut', {
+                      date: corr.attendanceDate,
+                      inTime: corr.requestedCheckIn,
+                      outTime: corr.requestedCheckOut,
+                    })}
                   </div>
 
                   <p className="text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100 italic">
@@ -538,20 +645,18 @@ export const AttendancePage: React.FC = () => {
                   {corr.status === 'PENDING' && isManager && (
                     <div className="pt-2 flex items-center justify-end gap-2">
                       <button
-                        onClick={() =>
-                          reviewAttendanceCorrection(corr.correctionId, 'REJECTED')
-                        }
-                        className="px-3 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200"
+                        type="button"
+                        onClick={() => reviewAttendanceCorrection(corr.correctionId, 'REJECTED')}
+                        className="px-3 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 cursor-pointer"
                       >
-                        Reject
+                        {t('notifReject')}
                       </button>
                       <button
-                        onClick={() =>
-                          reviewAttendanceCorrection(corr.correctionId, 'APPROVED')
-                        }
-                        className="px-3 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs active:scale-[0.98]"
+                        type="button"
+                        onClick={() => reviewAttendanceCorrection(corr.correctionId, 'APPROVED')}
+                        className="px-3 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs active:scale-[0.98] cursor-pointer"
                       >
-                        Approve & Overwrite
+                        {t('approveAndOverwrite')}
                       </button>
                     </div>
                   )}
@@ -562,10 +667,11 @@ export const AttendancePage: React.FC = () => {
 
           <div className="pt-4 border-t border-slate-100 flex justify-end">
             <button
+              type="button"
               onClick={() => setIsQueueDrawerOpen(false)}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700"
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
             >
-              Close Queue
+              {t('closeQueue')}
             </button>
           </div>
         </div>

@@ -3,20 +3,23 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import { CalendarCheck } from '@phosphor-icons/react';
 import { useHrmsStore } from '../../store/useHrmsStore';
+import { useI18n } from '../../i18n/useI18n';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 export const LeaveSummaryChart: React.FC = () => {
   const { leaves } = useHrmsStore();
+  const { t, tLeaveType } = useI18n();
 
   // Aggregate real leaves by leaveType
   const typeCounts: Record<string, number> = {};
   leaves.forEach((l) => {
-    const type = l.leaveType || 'General Leave';
+    const type = l.leaveType || 'Casual Leave';
     typeCounts[type] = (typeCounts[type] || 0) + 1;
   });
 
-  const categories = Object.keys(typeCounts);
+  const rawCategories = Object.keys(typeCounts);
+  const categories = rawCategories.map((c) => tLeaveType(c));
   const counts = Object.values(typeCounts);
 
   const palette = ['#06B6D4', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899'];
@@ -44,7 +47,7 @@ export const LeaveSummaryChart: React.FC = () => {
       },
       tooltip: {
         callbacks: {
-          label: (context: any) => ` ${context.label}: ${context.raw} Applications`,
+          label: (context: any) => ` ${context.label}: ${context.raw} ${t('applicationsUnit')}`,
         },
       },
     },
@@ -54,11 +57,11 @@ export const LeaveSummaryChart: React.FC = () => {
     <div className="bg-white/90 backdrop-blur-md rounded-2xl p-6 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col h-full justify-between">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h2 className="text-sm font-bold text-slate-900 tracking-tight">Leave Distribution</h2>
-          <p className="text-[11px] text-slate-400 mt-0.5">Categorical allocation of staff time-off</p>
+          <h2 className="text-sm font-bold text-slate-900 tracking-tight">{t('leaveDistTitle')}</h2>
+          <p className="text-[11px] text-slate-400 mt-0.5">{t('leaveDistSub')}</p>
         </div>
         <span className="text-[11px] font-mono font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
-          {leaves.length} Total
+          {t('totalSuffix', { count: leaves.length })}
         </span>
       </div>
 
@@ -67,9 +70,9 @@ export const LeaveSummaryChart: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-400 mb-2.5 shadow-xs">
             <CalendarCheck weight="duotone" className="w-6 h-6 text-slate-400" />
           </div>
-          <p className="text-xs font-semibold text-slate-700">No Leave Records</p>
+          <p className="text-xs font-semibold text-slate-700">{t('noLeaveRecords')}</p>
           <p className="text-[11px] text-slate-400 mt-1 max-w-[240px] leading-relaxed">
-            Staff leave submissions and applications will appear in this distribution breakdown.
+            {t('noLeaveRecordsDesc')}
           </p>
         </div>
       ) : (
@@ -80,7 +83,7 @@ export const LeaveSummaryChart: React.FC = () => {
           </div>
 
           {/* Side Legend */}
-          <div className="flex flex-col gap-2.5 flex-1 pl-2">
+          <div className="flex flex-col gap-2.5 flex-1 pl-2 min-w-0">
             {categories.map((label, idx) => {
               const count = counts[idx];
               const pct = Math.round((count / leaves.length) * 100);
@@ -91,7 +94,7 @@ export const LeaveSummaryChart: React.FC = () => {
                     style={{ backgroundColor: palette[idx % palette.length] }}
                   />
                   <span className="truncate text-xs font-medium text-slate-700 flex-1">{label}</span>
-                  <span className="text-[11px] font-mono font-semibold text-slate-800">
+                  <span className="text-[11px] font-mono font-semibold text-slate-800 tabular-nums">
                     {count} <span className="text-[10px] text-slate-400 font-normal">({pct}%)</span>
                   </span>
                 </div>

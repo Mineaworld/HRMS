@@ -29,7 +29,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   const badgeStyle = accentMap[accent] || accentMap.blue;
 
   return (
-    <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-slate-200 transition-shadow transition-colors duration-150 flex flex-col justify-between min-h-[118px]">
+    <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 border border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-slate-200 transition-[box-shadow,border-color] duration-150 flex flex-col justify-between min-h-[118px]">
       {/* Top Row: Stat Figure on Left, Vibrant Icon Badge on Right */}
       <div className="flex items-start justify-between">
         <div className="text-3xl font-extrabold tracking-tight text-slate-900 font-sans tabular-nums leading-none">

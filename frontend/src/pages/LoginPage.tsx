@@ -19,17 +19,18 @@ import {
 } from '@phosphor-icons/react';
 import { useHrmsStore } from '../store/useHrmsStore';
 import { UserRole, UserAccount } from '../types';
-import { ROLE_PERSONAS } from '../utils/rbac';
 import { authApi, TokenResponse } from '../api';
 import { Modal } from '../components/ui/modal';
-
+import { LanguageSwitcher } from '../components/ui/LanguageSwitcher';
+import { useI18n } from '../i18n/useI18n';
 
 export const LoginPage: React.FC = () => {
   const { login } = useHrmsStore();
+  const { t } = useI18n();
 
   const [mode, setMode] = useState<'login' | 'otp' | 'reset'>('login');
   const [userName, setUserName] = useState('sysadmin');
-  const [password, setPassword] = useState('Ahsva@087');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -58,7 +59,7 @@ export const LoginPage: React.FC = () => {
 
   // Auto-fetch OTP from Mailpit upon entering OTP mode
   useEffect(() => {
-    let timer: any;
+    let timer: ReturnType<typeof setTimeout>;
     if (mode === 'otp') {
       timer = setTimeout(() => {
         handleFetchMailpitOtp();
@@ -90,38 +91,29 @@ export const LoginPage: React.FC = () => {
           ? 'ROLE_HR'
           : 'ROLE_EMPLOYEE')
     );
-    const persona = ROLE_PERSONAS[role];
 
     return {
-      accountId: accountIdFromApi ?? (role === 'ROLE_ADMIN' ? 4 : 1),
+      accountId: accountIdFromApi ?? 0,
       userName: uName,
       fullName:
         uName === 'sysadmin'
           ? 'System Administrator'
           : uName === 'admin'
           ? 'HR Administrator'
-          : persona?.fullName || uName,
-      email:
-        emailFromApi ||
-        (uName === 'sysadmin'
-          ? 'sysadmin@hrms.local'
-          : persona?.email || `${uName}@hrms.local`),
+          : uName,
+      email: emailFromApi || `${uName}@hrms.local`,
       role,
       employeeId:
         employeeIdFromApi !== null && employeeIdFromApi !== undefined
           ? employeeIdFromApi
-          : uName === 'sysadmin'
-          ? undefined
-          : persona?.employeeId,
-      avatarUrl:
-        persona?.avatarUrl ||
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          : undefined,
+      avatarUrl: '',
     };
   };
 
   const performLogin = async (usr: string, pwd: string) => {
     if (!usr.trim() || !pwd.trim()) {
-      setErrorMessage('Please enter both your username and password.');
+      setErrorMessage(t('enterCredentialsError'));
       return;
     }
 
@@ -145,20 +137,22 @@ export const LoginPage: React.FC = () => {
           return;
         }
 
-        setStatusMessage(
-          res.message || 'A 6-digit verification code has been dispatched to your email.'
-        );
+        setStatusMessage(res.message || t('otpDispatchedMsg'));
         setMode('otp');
         setOtpCode('');
       } else {
-        setErrorMessage(res?.message || 'Invalid username or password.');
+        setErrorMessage(res?.message || t('invalidCredentialsError'));
       }
     } catch (err: any) {
-      const msg =
-        err.response?.data?.message ||
-        (err.code === 'ERR_NETWORK'
-          ? 'Cannot reach API Gateway (:8080). Please ensure backend services are running.'
-          : err.message || 'Invalid username or password.');
+      const isNet =
+        err.code === 'ERR_NETWORK' ||
+        err.message?.includes('Network Error') ||
+        err.response?.status === 502 ||
+        err.response?.status === 503;
+
+      const msg = isNet
+        ? t('gatewayUnreachableError')
+        : err.response?.data?.message || err.message || t('invalidCredentialsError');
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -171,14 +165,12 @@ export const LoginPage: React.FC = () => {
       const code = await authApi.fetchLatestMailpitOtp(userName);
       if (code) {
         setOtpCode(code);
-        setStatusMessage(`Auto-filled OTP [${code}] from Mailpit test inbox (:8025)`);
+        setStatusMessage(t('autoFilledOtpMsg', { code }));
       } else {
-        setErrorMessage(
-          `No recent OTP found in Mailpit inbox for @${userName}. You can view incoming emails at http://localhost:8025`
-        );
+        setErrorMessage(t('noMailpitOtpError', { user: userName }));
       }
     } catch {
-      setErrorMessage('Could not connect to Mailpit at http://localhost:8025.');
+      setErrorMessage(t('mailpitConnectError'));
     } finally {
       setIsFetchingMailpit(false);
     }
@@ -187,7 +179,7 @@ export const LoginPage: React.FC = () => {
   const handleOtpVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setErrorMessage('Please enter the 6-digit verification code.');
+      setErrorMessage(t('enterOtpError'));
       return;
     }
 
@@ -201,7 +193,7 @@ export const LoginPage: React.FC = () => {
       });
 
       if (!res || !res.success) {
-        setErrorMessage(res?.message || 'Invalid or expired OTP code.');
+        setErrorMessage(res?.message || t('invalidOtpError'));
         setIsLoading(false);
         return;
       }
@@ -232,9 +224,7 @@ export const LoginPage: React.FC = () => {
       login(user, res.token);
     } catch (err: any) {
       const msg =
-        err.response?.data?.message ||
-        err.message ||
-        'OTP verification failed. Please try again.';
+        err.response?.data?.message || err.message || t('otpVerifyFailedError');
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -248,16 +238,14 @@ export const LoginPage: React.FC = () => {
     try {
       const res = await authApi.login({ userName: userName.trim(), password });
       if (res && res.success) {
-        setStatusMessage(res.message || 'A fresh OTP has been sent to your inbox.');
+        setStatusMessage(res.message || t('freshOtpSentMsg'));
         setTimeout(() => handleFetchMailpitOtp(), 800);
       } else {
-        setErrorMessage(res?.message || 'Failed to resend verification code.');
+        setErrorMessage(res?.message || t('resendOtpFailedError'));
       }
     } catch (err: any) {
       const msg =
-        err.response?.data?.message ||
-        err.message ||
-        'Failed to resend verification code.';
+        err.response?.data?.message || err.message || t('resendOtpFailedError');
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -269,22 +257,22 @@ export const LoginPage: React.FC = () => {
     setFirstLoginError(null);
 
     if (!firstLoginCurrentPassword) {
-      setFirstLoginError('Please enter your current temporary password.');
+      setFirstLoginError(t('errEnterTempPwd'));
       return;
     }
     if (!firstLoginNewPassword || firstLoginNewPassword.length < 8) {
-      setFirstLoginError('New password must be at least 8 characters long.');
+      setFirstLoginError(t('errMinPwdLen'));
       return;
     }
     if (firstLoginNewPassword === firstLoginCurrentPassword) {
-      setFirstLoginError('New password must be different from current password.');
+      setFirstLoginError(t('errSamePwd'));
       return;
     }
     if (
       firstLoginConfirmPassword &&
       firstLoginNewPassword !== firstLoginConfirmPassword
     ) {
-      setFirstLoginError('Password confirmation does not match.');
+      setFirstLoginError(t('errPwdMismatch'));
       return;
     }
 
@@ -311,13 +299,11 @@ export const LoginPage: React.FC = () => {
         );
         login(user, res.token);
       } else {
-        setFirstLoginError(res?.message || 'Failed to update initial password.');
+        setFirstLoginError(res?.message || t('errChangeInitialPwd'));
       }
     } catch (err: any) {
       const msg =
-        err.response?.data?.message ||
-        err.message ||
-        'Failed to change initial password. Please verify current password and try again.';
+        err.response?.data?.message || err.message || t('errChangeInitialPwd');
       setFirstLoginError(msg);
     } finally {
       setIsChangingPassword(false);
@@ -327,7 +313,7 @@ export const LoginPage: React.FC = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userName.trim() || !newPassword.trim()) {
-      setErrorMessage('Please enter your username and a new password.');
+      setErrorMessage(t('resetValidationError'));
       return;
     }
 
@@ -340,21 +326,15 @@ export const LoginPage: React.FC = () => {
         newPassword,
       });
       if (res && res.success) {
-        setStatusMessage(
-          'Password reset successfully! Please sign in with your new password.'
-        );
+        setStatusMessage(t('resetSuccessMsg'));
         setPassword(newPassword);
         setMode('login');
       } else {
-        setErrorMessage(
-          res?.message || 'Could not reset password for this account.'
-        );
+        setErrorMessage(res?.message || t('resetFailedError'));
       }
     } catch (err: any) {
       const msg =
-        err.response?.data?.message ||
-        err.message ||
-        'Could not reset password for this account.';
+        err.response?.data?.message || err.message || t('resetFailedError');
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -362,12 +342,15 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen flex flex-col items-center justify-center p-4 bg-[#eaf1f7] relative overflow-hidden select-none">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[#eaf1f7] relative overflow-hidden">
       {/* Ambient background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-blue-200/40 via-sky-100/20 to-transparent blur-3xl pointer-events-none" />
+      <div
+        aria-hidden="true"
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-blue-200/40 via-sky-100/20 to-transparent blur-3xl pointer-events-none"
+      />
 
       {/* Main Login Container */}
-      <div className="relative w-full max-w-md z-10 space-y-5">
+      <div className="relative w-full max-w-md z-10 space-y-5 animate-fadeIn">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/20">
@@ -375,19 +358,32 @@ export const LoginPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              BigBoss
+              {t('brandName')}
             </h1>
             <p className="text-xs font-medium text-slate-500 uppercase tracking-widest mt-0.5">
-              Workforce Operations Cloud
+              {t('brandTagline')}
             </p>
           </div>
         </div>
 
         {/* Card Box */}
         <div className="bg-white/90 backdrop-blur-xl border border-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] rounded-3xl p-7 sm:p-8 space-y-5">
+          {/* Login Card Header with Flag-Only Language Switcher */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>{t('gatewayLabel')}</span>
+            </div>
+            <LanguageSwitcher variant="login" />
+          </div>
+
           {/* Status / Alert Banner */}
           {errorMessage && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fadeIn">
+            <div
+              role="alert"
+              aria-live="polite"
+              className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fadeIn"
+            >
               <WarningCircle
                 weight="fill"
                 className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5"
@@ -399,7 +395,11 @@ export const LoginPage: React.FC = () => {
           )}
 
           {statusMessage && (
-            <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200/80 text-xs text-blue-700 flex items-start gap-2.5 animate-fadeIn">
+            <div
+              role="status"
+              aria-live="polite"
+              className="p-3.5 rounded-xl bg-blue-50 border border-blue-200/80 text-xs text-blue-700 flex items-start gap-2.5 animate-fadeIn"
+            >
               <CheckCircle
                 weight="fill"
                 className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5"
@@ -420,28 +420,38 @@ export const LoginPage: React.FC = () => {
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Username or Corporate ID
+                <label
+                  htmlFor="login-username"
+                  className="block text-xs font-semibold text-slate-700 mb-1.5"
+                >
+                  {t('loginUsernameLabel')}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <User weight="duotone" className="w-4 h-4" />
                   </span>
                   <input
+                    id="login-username"
+                    name="username"
                     type="text"
+                    autoComplete="username"
+                    spellCheck={false}
                     value={userName}
                     onChange={(e) => setUserName(e.target.value)}
-                    placeholder="e.g. sysadmin"
+                    placeholder={t('loginUsernamePlaceholder')}
                     required
-                    className="w-full pl-10 pr-3.5 py-2.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-400"
+                    className="w-full pl-10 pr-3.5 py-2.5 text-sm sm:text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors text-slate-900 placeholder:text-slate-400"
                   />
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Password
+                  <label
+                    htmlFor="login-password"
+                    className="text-xs font-semibold text-slate-700"
+                  >
+                    {t('loginPasswordLabel')}
                   </label>
                   <button
                     type="button"
@@ -450,9 +460,9 @@ export const LoginPage: React.FC = () => {
                       setStatusMessage(null);
                       setMode('reset');
                     }}
-                    className="text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                    className="text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:underline focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded px-1 cursor-pointer"
                   >
-                    Forgot password?
+                    {t('forgotPassword')}
                   </button>
                 </div>
                 <div className="relative">
@@ -460,17 +470,21 @@ export const LoginPage: React.FC = () => {
                     <Lock weight="duotone" className="w-4 h-4" />
                   </span>
                   <input
+                    id="login-password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
                     required
-                    className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 placeholder:text-slate-400"
+                    className="w-full pl-10 pr-10 py-2.5 text-sm sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors text-slate-900 placeholder:text-slate-400"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded-r-xl cursor-pointer"
                   >
                     {showPassword ? (
                       <EyeSlash weight="regular" className="w-4 h-4" />
@@ -489,26 +503,23 @@ export const LoginPage: React.FC = () => {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="w-3.5 h-3.5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
                   />
-                  <span>Remember this browser</span>
+                  <span>{t('rememberBrowser')}</span>
                 </label>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  Gateway :8080
-                </span>
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-slate-900/10 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 min-h-[42px] py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-semibold shadow-md shadow-slate-900/10 transition-[transform,background-color] duration-150 disabled:opacity-70 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
               >
                 {isLoading ? (
                   <>
                     <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
-                    <span>Verifying Credentials...</span>
+                    <span>{t('verifyingCredentials')}</span>
                   </>
                 ) : (
                   <>
-                    <span>Sign In to BigBoss</span>
+                    <span>{t('signInBtn')}</span>
                     <ArrowRight weight="bold" className="w-3.5 h-3.5" />
                   </>
                 )}
@@ -518,16 +529,16 @@ export const LoginPage: React.FC = () => {
 
           {/* MODE 2: TWO-FACTOR / 1-CLICK MAILPIT OTP */}
           {mode === 'otp' && (
-            <form onSubmit={handleOtpVerify} className="space-y-4">
+            <form onSubmit={handleOtpVerify} className="space-y-4 animate-fadeIn">
               <div className="text-center space-y-1">
                 <div className="inline-flex p-3 rounded-full bg-blue-50 text-blue-600 mb-1">
                   <ShieldCheck weight="duotone" className="w-8 h-8" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  Two-Factor Authentication
+                  {t('twoFactorTitle')}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Enter the 6-digit verification code sent for{' '}
+                  {t('twoFactorDesc')}{' '}
                   <span className="font-mono font-semibold text-slate-800">
                     @{userName}
                   </span>
@@ -542,10 +553,10 @@ export const LoginPage: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[11px] font-bold text-slate-800 truncate">
-                      Mailpit Test Inbox (:8025)
+                      {t('mailpitInboxTitle')}
                     </div>
                     <div className="text-[10px] text-slate-500 truncate">
-                      Development OTP Capture
+                      {t('mailpitInboxSubtitle')}
                     </div>
                   </div>
                 </div>
@@ -554,35 +565,40 @@ export const LoginPage: React.FC = () => {
                   type="button"
                   onClick={handleFetchMailpitOtp}
                   disabled={isFetchingMailpit}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-[11px] font-semibold text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 active:scale-[0.98] transition-all shadow-xs disabled:opacity-60 flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-[11px] font-semibold text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 active:scale-[0.96] transition-[transform,background-color,border-color,color] duration-150 shadow-xs disabled:opacity-60 flex-shrink-0 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
                 >
                   {isFetchingMailpit ? (
                     <>
                       <CircleNotch weight="bold" className="w-3.5 h-3.5 animate-spin" />
-                      <span>Fetching...</span>
+                      <span>{t('fetchingOtp')}</span>
                     </>
                   ) : (
                     <>
                       <EnvelopeOpen weight="bold" className="w-3.5 h-3.5" />
-                      <span>Auto-fill OTP (:8025)</span>
+                      <span>{t('autoFillOtp')}</span>
                     </>
                   )}
                 </button>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5 text-center">
-                  6-Digit OTP Code
+                <label
+                  htmlFor="login-otp"
+                  className="block text-xs font-semibold text-slate-700 mb-1.5 text-center"
+                >
+                  {t('sixDigitOtpLabel')}
                 </label>
                 <input
+                  id="login-otp"
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={6}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="••••••"
-                  autoFocus
                   required
-                  className="w-full text-center tracking-[0.6em] text-xl font-mono py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900 font-bold placeholder:tracking-normal placeholder:font-sans placeholder:text-slate-300"
+                  className="w-full text-center tracking-[0.6em] text-xl font-mono py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors text-slate-900 font-bold placeholder:tracking-normal placeholder:font-sans placeholder:text-slate-300"
                 />
               </div>
 
@@ -590,16 +606,16 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition-all disabled:opacity-70"
+                  className="w-full flex items-center justify-center gap-2 min-h-[42px] py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition-[transform,background-color] duration-150 disabled:opacity-70 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
                 >
                   {isLoading ? (
                     <>
                       <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
-                      <span>Verifying Code...</span>
+                      <span>{t('verifyingCode')}</span>
                     </>
                   ) : (
                     <>
-                      <span>Complete Verification</span>
+                      <span>{t('completeVerification')}</span>
                       <CheckCircle weight="bold" className="w-4 h-4" />
                     </>
                   )}
@@ -612,20 +628,20 @@ export const LoginPage: React.FC = () => {
                       setMode('login');
                       setErrorMessage(null);
                     }}
-                    className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                    className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded px-1 py-0.5 cursor-pointer"
                   >
                     <ArrowLeft weight="bold" className="w-3.5 h-3.5" />
-                    <span>Back to Sign In</span>
+                    <span>{t('backToSignIn')}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleResendOtp}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded px-1 py-0.5 cursor-pointer"
                   >
                     <ArrowsClockwise weight="bold" className="w-3.5 h-3.5" />
-                    <span>Resend Code</span>
+                    <span>{t('resendCode')}</span>
                   </button>
                 </div>
               </div>
@@ -634,45 +650,56 @@ export const LoginPage: React.FC = () => {
 
           {/* MODE 3: RESET PASSWORD */}
           {mode === 'reset' && (
-            <form onSubmit={handleResetPassword} className="space-y-4">
+            <form onSubmit={handleResetPassword} className="space-y-4 animate-fadeIn">
               <div className="text-center space-y-1">
                 <div className="inline-flex p-3 rounded-full bg-slate-100 text-slate-800 mb-1">
                   <Key weight="duotone" className="w-7 h-7" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-900">
-                  Reset Account Password
+                  {t('resetPasswordTitle')}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Update your security credentials via the auth microservice
+                  {t('resetPasswordDesc')}
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Confirm Username
+                <label
+                  htmlFor="reset-username"
+                  className="block text-xs font-semibold text-slate-700 mb-1.5"
+                >
+                  {t('confirmUsername')}
                 </label>
                 <input
+                  id="reset-username"
                   type="text"
+                  autoComplete="username"
+                  spellCheck={false}
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  placeholder="e.g. sysadmin"
+                  placeholder={t('loginUsernamePlaceholder')}
                   required
-                  className="w-full px-3.5 py-2.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  className="w-full px-3.5 py-2.5 text-sm sm:text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  New Password
+                <label
+                  htmlFor="reset-new-password"
+                  className="block text-xs font-semibold text-slate-700 mb-1.5"
+                >
+                  {t('newPasswordLabel')}
                 </label>
                 <input
+                  id="reset-new-password"
                   type="password"
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new strong password"
+                  placeholder={t('newPasswordPlaceholder')}
                   required
                   minLength={8}
-                  className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  className="w-full px-3.5 py-2.5 text-sm sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors"
                 />
               </div>
 
@@ -680,15 +707,15 @@ export const LoginPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-md transition-all disabled:opacity-70"
+                  className="w-full flex items-center justify-center gap-2 min-h-[42px] py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-semibold shadow-md transition-[transform,background-color] duration-150 disabled:opacity-70 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
                 >
                   {isLoading ? (
                     <>
                       <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
-                      <span>Updating...</span>
+                      <span>{t('updating')}</span>
                     </>
                   ) : (
-                    <span>Update Password</span>
+                    <span>{t('updatePasswordBtn')}</span>
                   )}
                 </button>
 
@@ -698,10 +725,10 @@ export const LoginPage: React.FC = () => {
                     setMode('login');
                     setErrorMessage(null);
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded-xl cursor-pointer"
                 >
                   <ArrowLeft weight="bold" className="w-3.5 h-3.5" />
-                  <span>Cancel and Return</span>
+                  <span>{t('cancelAndReturn')}</span>
                 </button>
               </div>
             </form>
@@ -710,15 +737,12 @@ export const LoginPage: React.FC = () => {
           {/* Default Enterprise Access Credentials */}
           <div className="pt-4 border-t border-slate-100/90 text-center">
             <div className="text-[11px] text-slate-400">
-              Authorized System Administrator:{' '}
+              {t('authorizedSysAdmin')}{' '}
               <button
                 type="button"
-                onClick={() => {
-                  setUserName('sysadmin');
-                  setPassword('Ahsva@087');
-                }}
-                className="font-mono text-slate-700 font-semibold bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors cursor-pointer"
-                title="Fill sysadmin credentials"
+                onClick={() => setUserName('sysadmin')}
+                className="font-mono text-slate-700 font-semibold bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
+                title="sysadmin"
               >
                 sysadmin
               </button>
@@ -728,8 +752,8 @@ export const LoginPage: React.FC = () => {
 
         {/* Security & Architecture Note */}
         <div className="text-center text-[11px] text-slate-400 flex items-center justify-center gap-2">
-          <ShieldCheck weight="bold" className="w-4 h-4 text-emerald-600" />
-          <span>Spring Security • JWT Claims • Spring Cloud Gateway (:8080)</span>
+          <ShieldCheck weight="bold" className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{t('securityFooter')}</span>
         </div>
       </div>
 
@@ -742,8 +766,8 @@ export const LoginPage: React.FC = () => {
             localStorage.removeItem('hrms_jwt_token');
           }
         }}
-        title="Change Initial Password"
-        subtitle="Gateway Security Policy • First-Login Requirement"
+        title={t('firstLoginTitle')}
+        subtitle={t('firstLoginSubtitle')}
         maxWidth="md"
       >
         <form onSubmit={handleFirstLoginPasswordChange} className="space-y-4">
@@ -753,15 +777,17 @@ export const LoginPage: React.FC = () => {
               className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"
             />
             <div className="leading-relaxed">
-              <strong>Initial Password Change Required:</strong> The API
-              Gateway requires an initial password change before access to
-              workforce resources can be granted. Please establish your new
-              permanent password.
+              <strong>{t('firstLoginNoticeTitle')}</strong>{' '}
+              {t('firstLoginNoticeBody')}
             </div>
           </div>
 
           {firstLoginError && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fadeIn">
+            <div
+              role="alert"
+              aria-live="polite"
+              className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-xs text-rose-700 flex items-start gap-2.5 animate-fadeIn"
+            >
               <WarningCircle
                 weight="fill"
                 className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5"
@@ -773,25 +799,31 @@ export const LoginPage: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Current Temporary Password
+            <label
+              htmlFor="first-login-old-pwd"
+              className="block text-xs font-semibold text-slate-700 mb-1.5"
+            >
+              {t('currentTempPassword')}
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Lock weight="duotone" className="w-4 h-4" />
               </span>
               <input
+                id="first-login-old-pwd"
                 type={showModalOldPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 value={firstLoginCurrentPassword}
                 onChange={(e) => setFirstLoginCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
+                placeholder={t('enterCurrentPasswordPlaceholder')}
                 required
-                className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                className="w-full pl-10 pr-10 py-2.5 text-sm sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors text-slate-900"
               />
               <button
                 type="button"
                 onClick={() => setShowModalOldPassword(!showModalOldPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                aria-label={showModalOldPassword ? 'Hide current password' : 'Show current password'}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded-r-xl cursor-pointer"
               >
                 {showModalOldPassword ? (
                   <EyeSlash weight="regular" className="w-4 h-4" />
@@ -803,26 +835,32 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              New Permanent Password (min. 8 characters)
+            <label
+              htmlFor="first-login-new-pwd"
+              className="block text-xs font-semibold text-slate-700 mb-1.5"
+            >
+              {t('newPermanentPassword')}
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Key weight="duotone" className="w-4 h-4" />
               </span>
               <input
+                id="first-login-new-pwd"
                 type={showModalNewPassword ? 'text' : 'password'}
+                autoComplete="new-password"
                 value={firstLoginNewPassword}
                 onChange={(e) => setFirstLoginNewPassword(e.target.value)}
-                placeholder="Enter new strong password"
+                placeholder={t('newPasswordPlaceholder')}
                 required
                 minLength={8}
-                className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                className="w-full pl-10 pr-10 py-2.5 text-sm sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors text-slate-900"
               />
               <button
                 type="button"
                 onClick={() => setShowModalNewPassword(!showModalNewPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                aria-label={showModalNewPassword ? 'Hide new password' : 'Show new password'}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none rounded-r-xl cursor-pointer"
               >
                 {showModalNewPassword ? (
                   <EyeSlash weight="regular" className="w-4 h-4" />
@@ -834,21 +872,26 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Confirm New Password
+            <label
+              htmlFor="first-login-confirm-pwd"
+              className="block text-xs font-semibold text-slate-700 mb-1.5"
+            >
+              {t('confirmNewPassword')}
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Key weight="duotone" className="w-4 h-4" />
               </span>
               <input
+                id="first-login-confirm-pwd"
                 type={showModalNewPassword ? 'text' : 'password'}
+                autoComplete="new-password"
                 value={firstLoginConfirmPassword}
                 onChange={(e) => setFirstLoginConfirmPassword(e.target.value)}
-                placeholder="Re-enter new password"
+                placeholder={t('reenterNewPasswordPlaceholder')}
                 required
                 minLength={8}
-                className="w-full pl-10 pr-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                className="w-full pl-10 pr-3.5 py-2.5 text-sm sm:text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors text-slate-900"
               />
             </div>
           </div>
@@ -862,23 +905,23 @@ export const LoginPage: React.FC = () => {
                   localStorage.removeItem('hrms_jwt_token');
                 }
               }}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors"
+              className="min-h-[40px] px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={isChangingPassword}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all disabled:opacity-70"
+              className="flex items-center gap-2 min-h-[40px] px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 active:scale-[0.98] transition-[transform,background-color] duration-150 disabled:opacity-70 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
             >
               {isChangingPassword ? (
                 <>
                   <CircleNotch weight="bold" className="w-4 h-4 animate-spin" />
-                  <span>Updating Password...</span>
+                  <span>{t('updatingPassword')}</span>
                 </>
               ) : (
                 <>
-                  <span>Change Password & Enter HRMS</span>
+                  <span>{t('changePasswordAndEnter')}</span>
                   <ArrowRight weight="bold" className="w-3.5 h-3.5" />
                 </>
               )}

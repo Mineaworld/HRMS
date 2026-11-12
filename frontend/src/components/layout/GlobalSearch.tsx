@@ -12,12 +12,15 @@ import {
   ChartLineUp,
   House,
   ArrowRight,
+  Briefcase,
 } from '@phosphor-icons/react';
 import { useHrmsStore, NavTab } from '../../store/useHrmsStore';
+import { useI18n } from '../../i18n/useI18n';
+import { isRoleAllowedForTab } from '../../utils/rbac';
 
 interface SearchItem {
   id: string;
-  category: 'Navigation' | 'Employees' | 'Departments' | 'Leaves' | 'Actions';
+  categoryKey: 'catNavigation' | 'catEmployees' | 'catDepartments' | 'catJobs' | 'catLeaves' | 'catActions';
   title: string;
   subtitle: string;
   badge?: string;
@@ -33,9 +36,13 @@ export const GlobalSearch: React.FC = () => {
     setSearchQuery,
     employees,
     departments,
+    jobs,
     leaves,
     setActiveTab,
+    setDepartmentsView,
+    currentUser,
   } = useHrmsStore();
+  const { t, tStatus, tLeaveType } = useI18n();
 
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -53,30 +60,31 @@ export const GlobalSearch: React.FC = () => {
       }
     }
   }, []);
+
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Navigation pages list
+  // Navigation pages list (RBAC-filtered & localized)
   const navPages = useMemo(
-    () => [
-      { id: 'dashboard', label: 'Dashboard', desc: 'Workforce overview & metrics', icon: House, tab: 'dashboard' as NavTab },
-      { id: 'employees', label: 'Employees', desc: 'Staff directory & profiles', icon: TreeStructure, tab: 'employees' as NavTab },
-      { id: 'departments', label: 'Departments', desc: 'Org units & departmental budgets', icon: Buildings, tab: 'departments' as NavTab },
-      { id: 'attendance', label: 'Attendance & Punch', desc: 'Punch station & late arrival audit', icon: Clock, tab: 'attendance' as NavTab },
-      { id: 'leaves', label: 'Leave Management', desc: 'Leave requests & approvals queue', icon: CalendarCheck, tab: 'leaves' as NavTab },
-      { id: 'payroll', label: 'Payroll & Compensation', desc: 'Salary batch calculation & payslips', icon: CurrencyDollar, tab: 'payroll' as NavTab },
-      { id: 'automations', label: 'Automations & CRON', desc: 'Scheduled jobs & reconciler tasks', icon: Cpu, tab: 'automations' as NavTab },
-      { id: 'reports', label: 'Workforce Analytics', desc: 'Executive intelligence & data export', icon: ChartLineUp, tab: 'reports' as NavTab },
-      { id: 'profile', label: 'Account Profile', desc: 'Credentials & assigned authorities', icon: User, tab: 'profile' as NavTab },
-    ],
-    []
+    () =>
+      [
+        { id: 'dashboard', label: t('navDashboard'), desc: t('gsDashboardDesc'), icon: House, tab: 'dashboard' as NavTab },
+        { id: 'employees', label: t('navEmployees'), desc: t('gsEmployeesDesc'), icon: TreeStructure, tab: 'employees' as NavTab },
+        { id: 'departments', label: t('navOrganization'), desc: t('gsDepartmentsDesc'), icon: Buildings, tab: 'departments' as NavTab },
+        { id: 'attendance', label: t('navAttendance'), desc: t('gsAttendanceDesc'), icon: Clock, tab: 'attendance' as NavTab },
+        { id: 'leaves', label: t('navLeaves'), desc: t('gsLeavesDesc'), icon: CalendarCheck, tab: 'leaves' as NavTab },
+        { id: 'payroll', label: t('navPayroll'), desc: t('gsPayrollDesc'), icon: CurrencyDollar, tab: 'payroll' as NavTab },
+        { id: 'automations', label: t('navAutomations'), desc: t('gsAutomationsDesc'), icon: Cpu, tab: 'automations' as NavTab },
+        { id: 'reports', label: t('navReports'), desc: t('gsReportsDesc'), icon: ChartLineUp, tab: 'reports' as NavTab },
+        { id: 'profile', label: t('navProfile'), desc: t('gsProfileDesc'), icon: User, tab: 'profile' as NavTab },
+      ].filter((p) => isRoleAllowedForTab(currentUser.role, p.tab)),
+    [t, currentUser.role]
   );
 
   // Global Keyboard listener for "/" and "Cmd+K" / "Ctrl+K"
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is already typing in another input/textarea
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
@@ -114,11 +122,10 @@ export const GlobalSearch: React.FC = () => {
     const items: SearchItem[] = [];
 
     if (!q) {
-      // Default: Top navigation quick-jumps and frequent actions
       navPages.slice(0, 5).forEach((p) => {
         items.push({
           id: `nav-${p.id}`,
-          category: 'Navigation',
+          categoryKey: 'catNavigation',
           title: p.label,
           subtitle: p.desc,
           icon: p.icon,
@@ -131,11 +138,11 @@ export const GlobalSearch: React.FC = () => {
 
       items.push({
         id: 'act-punch',
-        category: 'Actions',
-        title: 'Check-In Today',
-        subtitle: 'Record morning attendance punch',
+        categoryKey: 'catActions',
+        title: t('gsCheckInTitle'),
+        subtitle: t('gsCheckInDesc'),
         icon: Clock,
-        badge: 'PUNCH',
+        badge: t('badgePunch'),
         badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
         onSelect: () => {
           setActiveTab('attendance');
@@ -145,11 +152,11 @@ export const GlobalSearch: React.FC = () => {
 
       items.push({
         id: 'act-leave',
-        category: 'Actions',
-        title: 'Apply for Leave',
-        subtitle: 'Request time off or medical leave',
+        categoryKey: 'catActions',
+        title: t('gsApplyLeaveTitle'),
+        subtitle: t('gsApplyLeaveDesc'),
         icon: CalendarCheck,
-        badge: 'LEAVE',
+        badge: t('badgeLeave'),
         badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
         onSelect: () => {
           setActiveTab('leaves');
@@ -165,11 +172,11 @@ export const GlobalSearch: React.FC = () => {
       if (p.label.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)) {
         items.push({
           id: `nav-${p.id}`,
-          category: 'Navigation',
+          categoryKey: 'catNavigation',
           title: p.label,
           subtitle: p.desc,
           icon: p.icon,
-          badge: 'PAGE',
+          badge: t('badgePage'),
           badgeColor: 'bg-slate-100 text-slate-700 border-slate-200',
           onSelect: () => {
             setActiveTab(p.tab);
@@ -188,15 +195,16 @@ export const GlobalSearch: React.FC = () => {
         emp.jobTitle.toLowerCase().includes(q) ||
         emp.departmentName.toLowerCase().includes(q)
       ) {
+        const norm = (emp.status || '').toUpperCase().replace(/\s+/g, '_');
         items.push({
           id: `emp-${emp.employeeId}`,
-          category: 'Employees',
+          categoryKey: 'catEmployees',
           title: `${emp.firstName} ${emp.lastName}`,
           subtitle: `${emp.jobTitle} • ${emp.departmentName}`,
           avatarUrl: emp.avatarUrl,
-          badge: emp.status,
+          badge: tStatus(emp.status),
           badgeColor:
-            emp.status === 'Active'
+            norm === 'ACTIVE'
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
               : 'bg-amber-50 text-amber-700 border-amber-200',
           onSelect: () => {
@@ -212,18 +220,19 @@ export const GlobalSearch: React.FC = () => {
     departments.forEach((dept) => {
       if (
         dept.departmentName.toLowerCase().includes(q) ||
-        dept.description.toLowerCase().includes(q) ||
+        (dept.description && dept.description.toLowerCase().includes(q)) ||
         (dept.leadName && dept.leadName.toLowerCase().includes(q))
       ) {
         items.push({
           id: `dept-${dept.departmentId}`,
-          category: 'Departments',
+          categoryKey: 'catDepartments',
           title: dept.departmentName,
-          subtitle: `Lead: ${dept.leadName || 'Unassigned'} • ${dept.headCount} personnel`,
+          subtitle: `${t('gsLeadPrefix')} ${dept.leadName || t('unassigned')} • ${dept.headCount} ${t('gsPersonnelUnit')}`,
           icon: Buildings,
           badge: `$${(dept.budget || 0).toLocaleString()}`,
           badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
           onSelect: () => {
+            setDepartmentsView('departments');
             setActiveTab('departments');
             setIsOpen(false);
           },
@@ -231,20 +240,51 @@ export const GlobalSearch: React.FC = () => {
       }
     });
 
-    // 4. Matched Leave Requests
+    // 4. Matched Job Titles
+    jobs.forEach((job) => {
+      if (
+        job.jobTitle.toLowerCase().includes(q) ||
+        (job.departmentName && job.departmentName.toLowerCase().includes(q)) ||
+        (job.description && job.description.toLowerCase().includes(q))
+      ) {
+        items.push({
+          id: `job-${job.jobId}`,
+          categoryKey: 'catJobs',
+          title: job.jobTitle,
+          subtitle: `${job.departmentName || ''}${
+            job.minSalary && job.maxSalary
+              ? ` • $${job.minSalary.toLocaleString()} – $${job.maxSalary.toLocaleString()}`
+              : ''
+          }`,
+          icon: Briefcase,
+          badge: t('badgePosition'),
+          badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+          onSelect: () => {
+            setDepartmentsView('jobs');
+            setActiveTab('departments');
+            setSearchQuery(job.jobTitle);
+            setIsOpen(false);
+          },
+        });
+      }
+    });
+
+    // 5. Matched Leave Requests
     leaves.forEach((l) => {
+      const translatedType = tLeaveType(l.leaveType);
       if (
         l.employeeName.toLowerCase().includes(q) ||
         l.leaveType.toLowerCase().includes(q) ||
+        translatedType.toLowerCase().includes(q) ||
         l.reason.toLowerCase().includes(q)
       ) {
         items.push({
           id: `leave-${l.leaveId}`,
-          category: 'Leaves',
-          title: `${l.employeeName} — ${l.leaveType}`,
-          subtitle: `${l.daysCount} days (${l.startDate} to ${l.endDate}) • "${l.reason}"`,
+          categoryKey: 'catLeaves',
+          title: `${l.employeeName} — ${translatedType}`,
+          subtitle: `${l.daysCount} ${t('gsDaysUnit')} (${l.startDate} ${t('gsTo')} ${l.endDate})${l.reason ? ` • "${l.reason}"` : ''}`,
           icon: CalendarCheck,
-          badge: l.status,
+          badge: tStatus(l.status),
           badgeColor:
             l.status === 'APPROVED'
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -260,7 +300,7 @@ export const GlobalSearch: React.FC = () => {
     });
 
     return items;
-  }, [searchQuery, navPages, employees, departments, leaves, setActiveTab, setSearchQuery]);
+  }, [searchQuery, navPages, employees, departments, jobs, leaves, setActiveTab, setDepartmentsView, setSearchQuery, t, tStatus, tLeaveType]);
 
   // Reset selected index when results change
   useEffect(() => {
@@ -298,14 +338,15 @@ export const GlobalSearch: React.FC = () => {
   const groupedResults = useMemo(() => {
     const groups: Record<string, { item: SearchItem; globalIdx: number }[]> = {};
     searchResults.forEach((item, idx) => {
-      if (!groups[item.category]) groups[item.category] = [];
-      groups[item.category].push({ item, globalIdx: idx });
+      const catLabel = t(item.categoryKey);
+      if (!groups[catLabel]) groups[catLabel] = [];
+      groups[catLabel].push({ item, globalIdx: idx });
     });
     return groups;
-  }, [searchResults]);
+  }, [searchResults, t]);
 
   return (
-    <div className="relative w-80 sm:w-96" ref={searchContainerRef}>
+    <div className="relative flex-1 min-w-0 max-w-sm sm:flex-initial sm:w-80 lg:w-96" ref={searchContainerRef}>
       {/* Search Input Bar (40px desktop hit target) */}
       <div className="relative">
         <MagnifyingGlass
@@ -318,8 +359,9 @@ export const GlobalSearch: React.FC = () => {
           role="combobox"
           aria-expanded={isOpen}
           aria-autocomplete="list"
-          aria-label="Global search employees, departments, and records"
-          placeholder="Search employees, records or press /"
+          aria-controls="global-search-listbox"
+          aria-label={t('searchAria')}
+          placeholder={t('searchPlaceholder')}
           value={searchQuery}
           onFocus={() => setIsOpen(true)}
           onChange={(e) => {
@@ -327,7 +369,7 @@ export const GlobalSearch: React.FC = () => {
             setIsOpen(true);
           }}
           onKeyDown={handleKeyDown}
-          className="w-full h-10 pl-9 pr-16 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors shadow-2xs"
+          className="w-full h-10 pl-9 pr-14 rounded-xl bg-white border border-slate-200 text-sm sm:text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:border-blue-500 transition-colors shadow-2xs"
         />
 
         {searchQuery ? (
@@ -337,8 +379,8 @@ export const GlobalSearch: React.FC = () => {
               setSearchQuery('');
               inputRef.current?.focus();
             }}
-            aria-label="Clear search"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors active:scale-[0.96]"
+            aria-label={t('clearSearch')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer"
           >
             <X weight="bold" className="w-3 h-3" />
           </button>
@@ -352,11 +394,9 @@ export const GlobalSearch: React.FC = () => {
       {/* Dropdown Results Panel */}
       {isOpen && (
         <div
-          className="absolute left-0 top-12 z-50 w-full sm:w-[440px] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15 backdrop-blur-xl origin-top transition-all duration-150 animate-in fade-in zoom-in-95 max-h-[420px] overflow-y-auto"
-          style={{
-            animationDuration: '160ms',
-            animationTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          }}
+          id="global-search-listbox"
+          role="listbox"
+          className="absolute left-0 top-12 z-50 w-full sm:w-[440px] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15 backdrop-blur-xl origin-top animate-in zoom-in-95 max-h-[420px] overflow-y-auto overscroll-contain"
         >
           {searchResults.length === 0 ? (
             <div className="py-8 px-4 text-center">
@@ -364,10 +404,10 @@ export const GlobalSearch: React.FC = () => {
                 <MagnifyingGlass weight="duotone" className="w-5 h-5" />
               </div>
               <p className="text-xs font-bold text-slate-800">
-                No matching results for "{searchQuery}"
+                {t('gsNoResultsTitle', { query: searchQuery })}
               </p>
               <p className="text-[11px] text-slate-400 mt-1 max-w-[260px] mx-auto">
-                Try searching by employee full name, job title, department, or leave reason.
+                {t('gsNoResultsHint')}
               </p>
             </div>
           ) : (
@@ -383,13 +423,14 @@ export const GlobalSearch: React.FC = () => {
                       const Icon = item.icon;
 
                       return (
-                        <div
+                        <button
                           key={item.id}
+                          type="button"
                           role="option"
                           aria-selected={isSelected}
                           onMouseEnter={() => setSelectedIndex(globalIdx)}
                           onClick={item.onSelect}
-                          className={`flex items-center gap-3 p-2 rounded-xl text-left cursor-pointer transition-colors duration-100 ${
+                          className={`w-full flex items-center gap-3 p-2 rounded-xl text-left cursor-pointer transition-colors duration-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none ${
                             isSelected
                               ? 'bg-blue-50/80 text-blue-900 shadow-2xs'
                               : 'text-slate-700 hover:bg-slate-50'
@@ -400,6 +441,8 @@ export const GlobalSearch: React.FC = () => {
                             <img
                               src={item.avatarUrl}
                               alt={item.title}
+                              width={32}
+                              height={32}
                               className="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-200 shrink-0"
                             />
                           ) : Icon ? (
@@ -428,7 +471,7 @@ export const GlobalSearch: React.FC = () => {
                               </span>
                               {item.badge && (
                                 <span
-                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase border ${
+                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-semibold border shrink-0 ${
                                     item.badgeColor || 'bg-slate-100 text-slate-600 border-slate-200'
                                   }`}
                                 >
@@ -449,7 +492,7 @@ export const GlobalSearch: React.FC = () => {
                           >
                             <ArrowRight weight="bold" className="w-3.5 h-3.5" />
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -464,16 +507,16 @@ export const GlobalSearch: React.FC = () => {
               <span className="flex items-center gap-1">
                 <kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200">↑</kbd>
                 <kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200">↓</kbd>
-                <span>Navigate</span>
+                <span className="font-sans">{t('gsNavigate')}</span>
               </span>
               <span className="flex items-center gap-1">
                 <kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200">↵</kbd>
-                <span>Select</span>
+                <span className="font-sans">{t('gsSelect')}</span>
               </span>
             </div>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200">esc</kbd>
-              <span>Close</span>
+              <span className="font-sans">{t('gsClose')}</span>
             </span>
           </div>
         </div>

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/useI18n";
 
 export interface HistoryOption {
   value: string | number;
@@ -41,7 +42,7 @@ interface StoredHistory {
 export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = ({
   options,
   label,
-  placeholder = "Select an option...",
+  placeholder,
   onChange,
   defaultValue,
   value,
@@ -52,6 +53,8 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
   disabled = false,
   id,
 }) => {
+  const { t } = useI18n();
+  const effectivePlaceholder = placeholder || t("selectOptionPlaceholder");
   // Normalize value to string for Radix Select compatibility
   const normalizedValue = value !== undefined ? String(value) : undefined;
   const normalizedDefault = defaultValue !== undefined ? String(defaultValue) : undefined;
@@ -185,7 +188,7 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
           )}
           style={fixedWidthStyle ? { width: fixedWidthStyle, minWidth: fixedWidthStyle } : undefined}
         >
-          <SelectValue placeholder={placeholder}>
+          <SelectValue placeholder={effectivePlaceholder}>
             {selectedOption ? selectedOption.label : undefined}
           </SelectValue>
         </SelectTrigger>
@@ -203,7 +206,7 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
           {recentItems.length > 0 && (
             <SelectGroup>
               <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-blue-600 px-3 py-1">
-                Recent
+                {t("recentGroup")}
               </SelectLabel>
               {recentItems.map((opt) => {
                 const stored = Array.isArray(history) ? history.find((h) => h.value === opt.value) : undefined;
@@ -229,7 +232,7 @@ export const BehavioralHistorySelect: React.FC<BehavioralHistorySelectProps> = (
             <SelectGroup>
               {recentItems.length > 0 && (
                 <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
-                  Other Options
+                  {t("otherOptionsGroup")}
                 </SelectLabel>
               )}
               {otherItems.map((opt) => (
