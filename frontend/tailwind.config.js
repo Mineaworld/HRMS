@@ -63,7 +63,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Inter', 'Kantumruy Pro', 'system-ui', '-apple-system', 'sans-serif'],
+        khmer: ['Kantumruy Pro', 'Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         card: '0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
