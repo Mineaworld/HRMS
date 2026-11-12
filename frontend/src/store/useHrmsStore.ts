@@ -13,6 +13,7 @@ import {
   AttendanceCorrection,
 } from '../types';
 import {
+  authApi,
   employeeApi,
   departmentApi,
   jobApi,
@@ -22,7 +23,7 @@ import {
   cronApi,
   reportApi,
 } from '../api';
-import { ROLE_PERSONAS } from '../utils/rbac';
+import { Language } from '../i18n/translations';
 
 export type NavTab =
   | 'dashboard'
@@ -43,15 +44,101 @@ export interface ActionResult<T = any> {
   data?: T;
 }
 
+const getInitialLanguage = (): Language => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('hrms_language');
+    if (saved === 'kh' || saved === 'en') {
+      document.documentElement.lang = saved === 'kh' ? 'km' : 'en';
+      document.documentElement.dataset.lang = saved;
+      return saved;
+    }
+    document.documentElement.lang = 'en';
+    document.documentElement.dataset.lang = 'en';
+  }
+  return 'en';
+};
+
+const getLocalDateStr = (date = new Date()): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const extractApiError = (err: any, fallback: string): string => {
+  return (
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    (Array.isArray(err?.response?.data?.errors) ? err.response.data.errors.join(', ') : null) ||
+    err?.message ||
+    fallback
+  );
+};
+
+const normalizeEmployee = (e: any): Employee => ({
+  employeeId: e.employeeId,
+  firstName: e.firstName || '',
+  lastName: e.lastName || '',
+  email: e.email || '',
+  phoneNumber: e.phoneNumber || '',
+  gender: e.gender || 'Other',
+  dob: e.dateOfBirth || e.dob || '1995-01-01',
+  dateOfBirth: e.dateOfBirth || e.dob || '1995-01-01',
+  salary: Number(e.salary ?? 0),
+  departmentId: e.departmentId || 1,
+  departmentName: e.departmentName || '',
+  jobTitle: e.jobTitle || '',
+  status:
+    e.status === 'ACTIVE'
+      ? 'Active'
+      : e.status === 'ON_LEAVE'
+      ? 'On Leave'
+      : e.status === 'TERMINATED'
+      ? 'Terminated'
+      : e.status === 'PROBATION'
+      ? 'Probation'
+      : (e.status || 'Active'),
+  hireDate: e.hireDate || e.contractEndDate || '',
+  contractEndDate: e.contractEndDate,
+  avatarUrl: e.avatarUrl || undefined,
+});
+
+const formatPayrollRecord = (p: any, employees: Employee[], fallbackPeriod: string): PayrollRecord => {
+  const emp = employees.find((e) => e.employeeId === p.employeeId);
+  return {
+    recordId: p.payrollId || p.recordId || Date.now() + (p.employeeId || 0),
+    employeeId: p.employeeId,
+    employeeName:
+      p.employeeName || (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${p.employeeId}`),
+    jobTitle: emp?.jobTitle || p.jobTitle || '',
+    departmentName: emp?.departmentName || p.departmentName || '',
+    periodMonth: String(p.period || fallbackPeriod),
+    baseSalary: Number(p.baseSalary ?? 0),
+    allowances: Number(p.allowances ?? 0),
+    lateDeductions: Number(p.lateDeduction ?? p.lateDeductions ?? 0),
+    taxDeductions: Number(p.unpaidLeaveDeduction ?? p.taxDeductions ?? 0),
+    netSalary: Number(p.netSalary ?? p.baseSalary ?? 0),
+    status: (p.status || 'PROCESSED') as PayrollRecord['status'],
+    paidDate: p.paidDate || p.generatedDate,
+  };
+};
+
 interface HrmsState {
+  // Language / i18n
+  language: Language;
+  setLanguage: (lang: Language) => void;
+
   // Session & Authentication
   isAuthenticated: boolean;
   login: (user: UserAccount, token?: string) => void;
   logout: () => void;
+  updateUserAvatar: (newUrl: string) => void;
 
   // Navigation & Role
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
+  departmentsView: 'departments' | 'jobs';
+  setDepartmentsView: (view: 'departments' | 'jobs') => void;
   currentUser: UserAccount;
 
   // Search & Filter
@@ -63,10 +150,10 @@ interface HrmsState {
   isGatewayConnected: boolean;
   gatewayError: string | null;
   jobs: JobTitle[];
-  cronHistory: any[];
+  cronHistory: JobExecution[];
   dashboardSummary: any | null;
 
-  // Domain Collections (Clean Initial Empty Arrays)
+  // Domain Collections (100% Pure Live API Gateway Data)
   employees: Employee[];
   departments: Department[];
   attendance: AttendanceRecord[];
@@ -84,12 +171,21 @@ interface HrmsState {
   updateDepartment: (id: number, dept: Partial<Department>) => Promise<ActionResult>;
   deleteDepartment: (id: number) => Promise<ActionResult>;
 
+  // Job Title Operations
+  addJobTitle: (job: Omit<JobTitle, 'jobId'>) => Promise<ActionResult<JobTitle>>;
+  deleteJobTitle: (id: number) => Promise<ActionResult>;
+
   // Cron Operations
-  triggerCronJob: (jobName: string) => Promise<void>;
+  triggerCronJob: (jobName: string) => Promise<ActionResult>;
 
   // Attendance Correction Operations
-  requestAttendanceCorrection: (req: Omit<AttendanceCorrection, 'correctionId' | 'status' | 'requestedAt'>) => Promise<ActionResult>;
-  reviewAttendanceCorrection: (correctionId: number, status: 'APPROVED' | 'REJECTED') => Promise<ActionResult>;
+  requestAttendanceCorrection: (
+    req: Omit<AttendanceCorrection, 'correctionId' | 'status' | 'requestedAt'>
+  ) => Promise<ActionResult>;
+  reviewAttendanceCorrection: (
+    correctionId: number,
+    status: 'APPROVED' | 'REJECTED'
+  ) => Promise<ActionResult>;
 
   // Employee Operations
   addEmployee: (emp: Omit<Employee, 'employeeId'> | any) => Promise<ActionResult<Employee>>;
@@ -97,39 +193,55 @@ interface HrmsState {
   deleteEmployee: (id: number) => Promise<ActionResult>;
 
   // Attendance Operations
-  checkInToday: (employeeId: number) => Promise<void>;
-  checkOutToday: (employeeId: number) => Promise<void>;
+  checkInToday: (employeeId?: number) => Promise<ActionResult<AttendanceRecord>>;
+  checkOutToday: (employeeId?: number) => Promise<ActionResult<AttendanceRecord>>;
   recordAttendancePunch: (type: 'IN' | 'OUT', note?: string) => Promise<ActionResult<AttendanceRecord>>;
 
   // Leave Operations
-  submitLeaveRequest: (req: Omit<LeaveRequest, 'leaveId' | 'status' | 'appliedDate'> | any) => Promise<ActionResult<LeaveRequest>>;
+  submitLeaveRequest: (
+    req: Omit<LeaveRequest, 'leaveId' | 'status' | 'appliedDate'> | any
+  ) => Promise<ActionResult<LeaveRequest>>;
   updateLeaveStatus: (leaveId: number, status: 'APPROVED' | 'REJECTED') => Promise<ActionResult>;
   cancelLeaveRequest: (leaveId: number) => Promise<ActionResult>;
 
   // Payroll Operations
+  fetchPayrollByPeriod: (periodMonth: string) => Promise<ActionResult<PayrollRecord[]>>;
   generateMonthlyPayroll: (periodMonth: string) => Promise<ActionResult>;
+  savePayrollProfile: (
+    employeeId: number,
+    payload: { baseSalary: number; dailyRate: number; latePenaltyPerMinute: number }
+  ) => Promise<ActionResult>;
   markPayrollPaid: (recordId: number) => Promise<ActionResult>;
 }
 
-export const useHrmsStore = create<HrmsState>((set, get) => {
-  // Restore authentication and user state from localStorage safely
-  const storedAuth = typeof window !== 'undefined' ? localStorage.getItem('hrms_authenticated') : null;
-  let isAuthenticated = storedAuth === 'true';
-  if (typeof window !== 'undefined') {
-    const search = new URLSearchParams(window.location.search);
-    if (search.get('auth') === 'true' || search.get('dev') === 'true') {
-      isAuthenticated = true;
-    }
+const normalizePeriodYm = (periodMonth: string): string => {
+  if (/^\d{4}-\d{2}$/.test(periodMonth)) return periodMonth;
+  const d = new Date(
+    periodMonth.includes(' ')
+      ? `${periodMonth.split(' ')[0]} 1, ${periodMonth.split(' ')[1]}`
+      : periodMonth
+  );
+  if (!isNaN(d.getTime())) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
+  return new Date().toISOString().substring(0, 7);
+};
+
+export const useHrmsStore = create<HrmsState>((set, get) => {
+  const initialLanguage = getInitialLanguage();
+
+  const storedAuth = typeof window !== 'undefined' ? localStorage.getItem('hrms_authenticated') : null;
+  const storedToken = typeof window !== 'undefined' ? localStorage.getItem('hrms_jwt_token') : null;
+  const isAuthenticated = storedAuth === 'true' && Boolean(storedToken);
 
   let initialUser: UserAccount = {
-    accountId: 4,
-    userName: 'sysadmin',
-    email: 'sysadmin@hrms.local',
-    role: 'ROLE_ADMIN',
+    accountId: 0,
+    userName: '',
+    email: '',
+    role: 'ROLE_EMPLOYEE',
     employeeId: undefined,
-    fullName: 'System Administrator',
-    avatarUrl: ROLE_PERSONAS.ROLE_ADMIN.avatarUrl,
+    fullName: '',
+    avatarUrl: '',
   };
   try {
     if (typeof localStorage !== 'undefined') {
@@ -139,12 +251,35 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
       }
     }
   } catch {
-    // Keep default admin persona fallback
+    // Keep default fallback user structure
   }
 
   return {
+    // Language
+    language: initialLanguage,
+    setLanguage: (lang) => {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('hrms_language', lang);
+        document.documentElement.lang = lang === 'kh' ? 'km' : 'en';
+        document.documentElement.dataset.lang = lang;
+      }
+      set({ language: lang });
+    },
+
     // Session State
     isAuthenticated,
+    updateUserAvatar: (newUrl) => {
+      set((s) => {
+        if (s.currentUser.avatarUrl && s.currentUser.avatarUrl.startsWith('blob:') && s.currentUser.avatarUrl !== newUrl) {
+          URL.revokeObjectURL(s.currentUser.avatarUrl);
+        }
+        const updatedUser = { ...s.currentUser, avatarUrl: newUrl };
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('hrms_user', JSON.stringify(updatedUser));
+        }
+        return { currentUser: updatedUser };
+      });
+    },
     login: (user, token) => {
       if (typeof window !== 'undefined') {
         localStorage.setItem('hrms_user', JSON.stringify(user));
@@ -153,8 +288,7 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           localStorage.setItem('hrms_jwt_token', token);
         }
       }
-      set({ currentUser: user, isAuthenticated: true, activeTab: 'dashboard' });
-      // Trigger instant background sync upon login
+      set({ currentUser: user, isAuthenticated: true, activeTab: 'dashboard', gatewayError: null });
       get().syncWithGateway();
     },
     logout: () => {
@@ -176,6 +310,8 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         dashboardSummary: null,
         pendingActions: [],
         announcements: [],
+        attendanceCorrections: [],
+        isGatewayConnected: true,
         gatewayError: null,
       });
     },
@@ -186,6 +322,8 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         ? (new URLSearchParams(window.location.search).get('tab') as NavTab)
         : 'dashboard',
     setActiveTab: (tab) => set({ activeTab: tab }),
+    departmentsView: 'departments',
+    setDepartmentsView: (view) => set({ departmentsView: view }),
     currentUser: initialUser,
 
     // Global Search Query
@@ -196,17 +334,17 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     isLoading: false,
     isGatewayConnected: true,
     gatewayError: null,
-    jobs: [],
-    cronHistory: [],
     dashboardSummary: null,
 
-    // Domain Collections (Clean Empty Initial State - Zero Mock Data)
-    employees: [],
+    // Domain Collections (100% Pure Live API Gateway - Clean Empty Initial State)
     departments: [],
+    jobs: [],
+    employees: [],
     attendance: [],
     leaves: [],
     payroll: [],
     pendingActions: [],
+    cronHistory: [],
     announcements: [],
     attendanceCorrections: [],
 
@@ -226,8 +364,177 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
 
       try {
         const currentPeriod = new Date().toISOString().substring(0, 7);
+        const role = get().currentUser.role;
+        const isEmployeeOnly = role === 'ROLE_EMPLOYEE';
 
-        // Fetch live microservices data in parallel via Spring Cloud Gateway (:8080)
+        const isUnauthorized = (res: PromiseSettledResult<any>) =>
+          res.status === 'rejected' && res.reason?.response?.status === 401;
+
+        const isNetworkFailure = (res: PromiseSettledResult<any>) =>
+          res.status === 'rejected' &&
+          (res.reason?.code === 'ERR_NETWORK' ||
+            res.reason?.code === 'ECONNREFUSED' ||
+            res.reason?.message?.includes('Network Error') ||
+            res.reason?.response?.status === 502 ||
+            res.reason?.response?.status === 503 ||
+            res.reason?.response?.status === 504);
+
+        // Fetch profile photo in background if available
+        authApi
+          .getProfilePhoto()
+          .then((blob) => {
+            if (blob && blob.size > 0) {
+              const objUrl = URL.createObjectURL(blob);
+              get().updateUserAvatar(objUrl);
+            }
+          })
+          .catch(() => {
+            // No uploaded photo or 404 — keep existing avatar
+          });
+
+        if (isEmployeeOnly) {
+          const [myProfileResult, jobResult, attResult, leaveResult, payrollResult] =
+            await Promise.allSettled([
+              employeeApi.getMyProfile(),
+              jobApi.getAll(),
+              attendanceApi.getMyAttendance(),
+              leaveApi.getMyLeaves(),
+              payrollApi.getMyPayroll(),
+            ]);
+
+          if (
+            isUnauthorized(myProfileResult) ||
+            isUnauthorized(jobResult) ||
+            isUnauthorized(leaveResult)
+          ) {
+            get().logout();
+            return;
+          }
+
+          if (
+            isNetworkFailure(myProfileResult) ||
+            isNetworkFailure(jobResult) ||
+            isNetworkFailure(attResult) ||
+            isNetworkFailure(leaveResult) ||
+            isNetworkFailure(payrollResult)
+          ) {
+            const failureReason =
+              myProfileResult.status === 'rejected' && isNetworkFailure(myProfileResult)
+                ? myProfileResult.reason
+                : jobResult.status === 'rejected' && isNetworkFailure(jobResult)
+                ? jobResult.reason
+                : attResult.status === 'rejected' && isNetworkFailure(attResult)
+                ? attResult.reason
+                : leaveResult.status === 'rejected' && isNetworkFailure(leaveResult)
+                ? leaveResult.reason
+                : (payrollResult as any).reason;
+            set({
+              isLoading: false,
+              isGatewayConnected: false,
+              gatewayError: extractApiError(
+                failureReason,
+                'Unable to reach Spring Cloud Gateway at http://localhost:8080.'
+              ),
+            });
+            return;
+          }
+
+          const employees: Employee[] =
+            myProfileResult.status === 'fulfilled' && myProfileResult.value
+              ? [normalizeEmployee(myProfileResult.value)]
+              : [];
+
+          if (employees[0]) {
+            const profileFullName = `${employees[0].firstName} ${employees[0].lastName}`.trim();
+            if (profileFullName && get().currentUser.fullName !== profileFullName) {
+              const updatedUser = {
+                ...get().currentUser,
+                fullName: profileFullName,
+                employeeId: employees[0].employeeId,
+              };
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('hrms_user', JSON.stringify(updatedUser));
+              }
+              set({ currentUser: updatedUser });
+            }
+          }
+
+          const jobs: JobTitle[] =
+            jobResult.status === 'fulfilled' && Array.isArray(jobResult.value) ? jobResult.value : [];
+
+          const attendance: AttendanceRecord[] =
+            attResult.status === 'fulfilled' && attResult.value
+              ? (Array.isArray(attResult.value) ? attResult.value : [attResult.value]).map((a: any) => {
+                  const formatTime = (t?: string) => {
+                    if (!t) return null;
+                    return t.includes('T') ? t.split('T')[1].substring(0, 5) : t.substring(0, 5);
+                  };
+                  return {
+                    attendanceId: a.attendanceId || Date.now(),
+                    employeeId: a.employeeId,
+                    employeeName: a.employeeName || get().currentUser.fullName,
+                    attendanceDate: String(a.attendanceDate || getLocalDateStr()),
+                    checkIn: formatTime(a.checkIn),
+                    checkOut: formatTime(a.checkOut),
+                    lateMinutes: a.lateMinutes || 0,
+                    otHours: a.otHours || 0,
+                    status: a.status || (a.lateMinutes > 0 ? 'LATE' : 'PRESENT'),
+                  };
+                })
+              : [];
+
+          const leaves: LeaveRequest[] =
+            leaveResult.status === 'fulfilled' && Array.isArray(leaveResult.value)
+              ? leaveResult.value.map((l: any) => ({
+                  leaveId: l.leaveId,
+                  employeeId: l.employeeId,
+                  employeeName: l.employeeName || get().currentUser.fullName,
+                  leaveType: l.leaveType || 'Casual Leave',
+                  startDate: l.startDate,
+                  endDate: l.endDate,
+                  daysCount:
+                    l.daysCount ||
+                    (l.startDate && l.endDate
+                      ? Math.round(
+                          (new Date(l.endDate).getTime() - new Date(l.startDate).getTime()) /
+                            (1000 * 60 * 60 * 24)
+                        ) + 1
+                      : 1),
+                  reason: l.reason || '',
+                  status: l.status || 'PENDING',
+                  approvedBy: l.approvedByName || l.approvedBy,
+                  appliedDate: l.appliedDate || l.startDate,
+                }))
+              : [];
+
+          const payroll: PayrollRecord[] =
+            payrollResult.status === 'fulfilled' && Array.isArray(payrollResult.value)
+              ? payrollResult.value.map((p: any) => formatPayrollRecord(p, employees, currentPeriod))
+              : [];
+
+          const hydratedEmployees = employees.map((emp) => {
+            const pr = payroll.find((p) => p.employeeId === emp.employeeId);
+            return pr && pr.baseSalary > 0 ? { ...emp, salary: pr.baseSalary } : emp;
+          });
+
+          set({
+            isLoading: false,
+            isGatewayConnected: true,
+            gatewayError: null,
+            employees: hydratedEmployees,
+            departments: [],
+            jobs,
+            attendance,
+            leaves,
+            payroll,
+            cronHistory: [],
+            dashboardSummary: null,
+            pendingActions: [],
+          });
+          return;
+        }
+
+        // Admin / HR parallel live synchronization via Spring Cloud Gateway (:8080)
         const [
           empResult,
           deptResult,
@@ -248,43 +555,18 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           reportApi.getDashboard(),
         ]);
 
-        // If session token is expired or unauthorized, reset session to prompt fresh login
-        const isUnauthorized = (res: PromiseSettledResult<any>) =>
-          res.status === 'rejected' && res.reason?.response?.status === 401;
-
         if (isUnauthorized(empResult) || isUnauthorized(deptResult)) {
-          const isDevOrTest =
-            typeof window !== 'undefined' &&
-            (new URLSearchParams(window.location.search).get('auth') === 'true' ||
-              new URLSearchParams(window.location.search).get('dev') === 'true');
-
-          if (isDevOrTest) {
-            set({ isLoading: false, isGatewayConnected: true });
-            return;
-          }
-
-          console.warn('Session token expired or unauthorized. Redirecting to login screen.');
           get().logout();
           return;
         }
 
-        // Evaluate connection failure / network errors
-        const isNetworkFailure = (res: PromiseSettledResult<any>) =>
-          res.status === 'rejected' &&
-          (res.reason?.code === 'ERR_NETWORK' ||
-            res.reason?.code === 'ECONNREFUSED' ||
-            res.reason?.message?.includes('Network Error') ||
-            res.reason?.response?.status === 502 ||
-            res.reason?.response?.status === 503 ||
-            res.reason?.response?.status === 504);
-
         if (isNetworkFailure(empResult) || isNetworkFailure(deptResult)) {
           const failureReason =
             empResult.status === 'rejected' ? empResult.reason : (deptResult as any).reason;
-          const errMsg =
-            failureReason?.response?.data?.message ||
-            failureReason?.message ||
-            'Unable to reach Spring Cloud Gateway at http://localhost:8080. Microservices may be offline.';
+          const errMsg = extractApiError(
+            failureReason,
+            'Unable to reach Spring Cloud Gateway at http://localhost:8080. Microservices may be offline.'
+          );
 
           set({
             isLoading: false,
@@ -294,185 +576,170 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           return;
         }
 
-        // 1. Process Live Employees
-        let employees: Employee[] = [];
-        if (empResult.status === 'fulfilled' && Array.isArray(empResult.value)) {
-          employees = empResult.value.map((e: any) => ({
-            employeeId: e.employeeId,
-            firstName: e.firstName || '',
-            lastName: e.lastName || '',
-            email: e.email || '',
-            phoneNumber: e.phoneNumber || '+855 12 345 678',
-            gender: e.gender || 'Other',
-            dob: e.dateOfBirth || e.dob || '1995-01-01',
-            salary: Number(e.salary ?? 2500),
-            departmentId: e.departmentId || 1,
-            departmentName: e.departmentName || 'General',
-            jobTitle: e.jobTitle || 'Staff',
-            status:
-              e.status === 'ACTIVE'
-                ? 'Active'
-                : e.status === 'ON_LEAVE'
-                ? 'On Leave'
-                : e.status === 'TERMINATED'
-                ? 'Terminated'
-                : (e.status || 'Active'),
-            hireDate: e.hireDate || e.contractEndDate || new Date().toISOString().split('T')[0],
-            avatarUrl:
-              e.avatarUrl ||
-              `https://images.unsplash.com/photo-${1534528741775 + (e.employeeId % 500)}?auto=format&fit=crop&w=200&q=80`,
-          }));
-        }
+        // 1. Live Employees
+        const employees: Employee[] =
+          empResult.status === 'fulfilled' && Array.isArray(empResult.value)
+            ? empResult.value.map(normalizeEmployee)
+            : [];
 
-        // 2. Process Live Departments
-        let departments: Department[] = [];
-        if (deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)) {
-          departments = deptResult.value.map((d: any) => {
-            const headCount = employees.filter((e) => e.departmentId === d.departmentId).length;
-            const lead = employees.find((e) => e.departmentId === d.departmentId);
-            return {
-              departmentId: d.departmentId,
-              departmentName: d.departmentName,
-              description: d.description || '',
-              headCount: d.headCount ?? headCount,
-              leadEmployeeId: d.leadEmployeeId ?? lead?.employeeId,
-              leadName: d.leadName ?? (lead ? `${lead.firstName} ${lead.lastName}` : 'Department Head'),
-              leadAvatar: d.leadAvatar ?? lead?.avatarUrl,
-              budget: d.budget ?? 150000,
-            };
-          });
-        }
+        // 2. Live Departments
+        const departments: Department[] =
+          deptResult.status === 'fulfilled' && Array.isArray(deptResult.value)
+            ? deptResult.value.map((d: any) => {
+                const assigned = employees.filter((e) => e.departmentId === d.departmentId);
+                const lead = assigned[0];
+                return {
+                  departmentId: d.departmentId,
+                  departmentName: d.departmentName,
+                  description: d.description || '',
+                  headCount: d.headCount ?? assigned.length,
+                  budget: d.budget ?? 50000,
+                  leadEmployeeId: d.leadEmployeeId ?? lead?.employeeId,
+                  leadName: d.leadName ?? (lead ? `${lead.firstName} ${lead.lastName}` : undefined),
+                  leadAvatar: d.leadAvatar ?? lead?.avatarUrl,
+                };
+              })
+            : [];
 
-        // 3. Process Live Job Titles
-        let jobs: JobTitle[] = [];
-        if (jobResult.status === 'fulfilled' && Array.isArray(jobResult.value)) {
-          jobs = jobResult.value;
-        }
+        // 3. Live Job Titles
+        const jobs: JobTitle[] =
+          jobResult.status === 'fulfilled' && Array.isArray(jobResult.value) ? jobResult.value : [];
 
-        // 4. Process Live Attendance Logs
-        let attendance: AttendanceRecord[] = [];
-        if (attResult.status === 'fulfilled' && Array.isArray(attResult.value)) {
-          attendance = attResult.value.map((a: any) => {
-            const emp = employees.find((e) => e.employeeId === a.employeeId);
-            const formatTime = (t?: string) => {
-              if (!t) return null;
-              return t.includes('T') ? t.split('T')[1].substring(0, 5) : t.substring(0, 5);
-            };
-            return {
-              attendanceId: a.attendanceId || Date.now(),
-              employeeId: a.employeeId,
-              employeeName:
-                a.employeeName ||
-                (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${a.employeeId}`),
-              attendanceDate: String(a.attendanceDate || new Date().toISOString().split('T')[0]),
-              checkIn: formatTime(a.checkIn),
-              checkOut: formatTime(a.checkOut),
-              lateMinutes: a.lateMinutes || 0,
-              otHours: a.otHours || 0,
-              status: a.status || (a.lateMinutes > 0 ? 'LATE' : 'PRESENT'),
-            };
-          });
-        }
+        // 4. Live Attendance Logs
+        const attendance: AttendanceRecord[] =
+          attResult.status === 'fulfilled' && Array.isArray(attResult.value)
+            ? attResult.value.map((a: any) => {
+                const emp = employees.find((e) => e.employeeId === a.employeeId);
+                const formatTime = (t?: string) => {
+                  if (!t) return null;
+                  return t.includes('T') ? t.split('T')[1].substring(0, 5) : t.substring(0, 5);
+                };
+                return {
+                  attendanceId: a.attendanceId || Date.now(),
+                  employeeId: a.employeeId,
+                  employeeName:
+                    a.employeeName ||
+                    (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${a.employeeId}`),
+                  attendanceDate: String(a.attendanceDate || getLocalDateStr()),
+                  checkIn: formatTime(a.checkIn),
+                  checkOut: formatTime(a.checkOut),
+                  lateMinutes: a.lateMinutes || 0,
+                  otHours: a.otHours || 0,
+                  status: a.status || (a.lateMinutes > 0 ? 'LATE' : 'PRESENT'),
+                };
+              })
+            : [];
 
-        // 5. Process Live Leave Requests
-        let leaves: LeaveRequest[] = [];
-        if (leaveResult.status === 'fulfilled' && Array.isArray(leaveResult.value)) {
-          leaves = leaveResult.value.map((l: any) => {
-            let daysCount = l.daysCount;
-            if (!daysCount && l.startDate && l.endDate) {
-              const diff =
-                Math.round(
-                  (new Date(l.endDate).getTime() - new Date(l.startDate).getTime()) /
-                    (1000 * 60 * 60 * 24)
-                ) + 1;
-              daysCount = Math.max(1, diff);
-            }
-            return {
-              leaveId: l.leaveId,
-              employeeId: l.employeeId,
-              employeeName: l.employeeName || 'Staff Member',
-              leaveType: l.leaveType || 'Casual Leave',
-              startDate: l.startDate,
-              endDate: l.endDate,
-              daysCount: daysCount || 1,
-              reason: l.reason || 'Leave requested',
-              status: l.status || 'PENDING',
-              approvedBy: l.approvedByName || l.approvedBy,
-              appliedDate: l.appliedDate || l.startDate,
-            };
-          });
-        }
+        // 5. Live Leave Applications
+        const leaves: LeaveRequest[] =
+          leaveResult.status === 'fulfilled' && Array.isArray(leaveResult.value)
+            ? leaveResult.value.map((l: any) => {
+                const emp = employees.find((e) => e.employeeId === l.employeeId);
+                let days = l.daysCount;
+                if (!days && l.startDate && l.endDate) {
+                  days =
+                    Math.round(
+                      (new Date(l.endDate).getTime() - new Date(l.startDate).getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    ) + 1;
+                }
+                return {
+                  leaveId: l.leaveId,
+                  employeeId: l.employeeId,
+                  employeeName:
+                    l.employeeName ||
+                    (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${l.employeeId}`),
+                  leaveType: l.leaveType || 'Casual Leave',
+                  startDate: l.startDate,
+                  endDate: l.endDate,
+                  daysCount: days || 1,
+                  reason: l.reason || '',
+                  status: l.status || 'PENDING',
+                  approvedBy: l.approvedByName || l.approvedBy,
+                  appliedDate: l.appliedDate || l.startDate,
+                };
+              })
+            : [];
 
-        // 6. Process Live Payroll Records
-        let payroll: PayrollRecord[] = [];
-        if (payrollResult.status === 'fulfilled' && Array.isArray(payrollResult.value)) {
-          payroll = payrollResult.value.map((p: any) => {
-            const emp = employees.find((e) => e.employeeId === p.employeeId);
-            return {
-              recordId: p.payrollId || p.recordId || Date.now(),
-              employeeId: p.employeeId,
-              employeeName:
-                p.employeeName || (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${p.employeeId}`),
-              jobTitle: emp?.jobTitle || p.jobTitle || 'Staff',
-              departmentName: emp?.departmentName || p.departmentName || 'General',
-              periodMonth: String(p.period || p.periodMonth || currentPeriod),
-              baseSalary: Number(p.baseSalary || 2500),
-              allowances: Number(p.allowances || 200),
-              lateDeductions: Number(p.lateDeduction || p.lateDeductions || 0),
-              taxDeductions: Number(p.unpaidLeaveDeduction || p.taxDeductions || 0),
-              netSalary: Number(p.netSalary || p.baseSalary || 2500),
-              status: p.status || 'PROCESSED',
-              paidDate: p.paidDate || p.generatedDate,
-            };
-          });
-        }
+        // 6. Live Payroll Records
+        const payroll: PayrollRecord[] =
+          payrollResult.status === 'fulfilled' && Array.isArray(payrollResult.value)
+            ? payrollResult.value.map((p: any) => formatPayrollRecord(p, employees, currentPeriod))
+            : [];
 
-        // 7. Process Live Cron Automation Telemetry
-        let cronHistory: JobExecution[] = [];
-        if (cronResult.status === 'fulfilled' && Array.isArray(cronResult.value)) {
-          cronHistory = cronResult.value.map((c: any) => ({
-            id: String(c.id),
-            jobName: c.jobName,
-            executionTime: c.startTime
-              ? c.startTime.replace('T', ' ').substring(0, 19)
-              : (c.executionTime || ''),
-            status: c.status === 'COMPLETED' ? 'SUCCESS' : c.status,
-            durationMs:
-              c.durationMs ??
-              (c.startTime && c.endTime
-                ? Math.max(1, Math.round(new Date(c.endTime).getTime() - new Date(c.startTime).getTime()))
-                : 0),
-            message: c.errorMessage || c.message || `Job ${c.jobName} executed successfully`,
-            triggeredBy: c.triggeredBy || 'CRON_SCHEDULER',
-          }));
-        }
+        // Hydrate employee base salaries from payroll records + job salary bands
+        const hydratedEmployees: Employee[] = employees.map((emp) => {
+          const pr = payroll.find((p) => p.employeeId === emp.employeeId);
+          if (pr && pr.baseSalary > 0) {
+            return { ...emp, salary: pr.baseSalary };
+          }
+          const matchedJob =
+            jobs.find((j) => j.jobId === (emp as any).jobId) ||
+            jobs.find(
+              (j) =>
+                j.jobTitle.trim().toLowerCase() === (emp.jobTitle || '').trim().toLowerCase()
+            );
+          if (matchedJob?.minSalary && matchedJob.minSalary > 0 && (!emp.salary || emp.salary <= 0)) {
+            return { ...emp, salary: matchedJob.minSalary };
+          }
+          return emp;
+        });
 
-        // 8. Process Live Dashboard Analytics Summary
+        // 7. Live CRON History
+        const cronHistory: JobExecution[] =
+          cronResult.status === 'fulfilled' && Array.isArray(cronResult.value)
+            ? cronResult.value.map((c: any) => ({
+                id: String(c.id),
+                jobName: c.jobName,
+                executionTime: c.startTime
+                  ? c.startTime.replace('T', ' ').substring(0, 19)
+                  : c.executionTime || '',
+                status: c.status === 'COMPLETED' ? 'SUCCESS' : c.status,
+                durationMs:
+                  c.durationMs ??
+                  (c.startTime && c.endTime
+                    ? Math.max(1, Math.round(new Date(c.endTime).getTime() - new Date(c.startTime).getTime()))
+                    : 0),
+                message: c.errorMessage || c.message || `Job ${c.jobName} executed`,
+                triggeredBy: c.triggeredBy || 'CRON_SCHEDULER',
+              }))
+            : [];
+
+        // 8. Live Report Dashboard Metrics (unwrap ApiResponse<DashboardSummaryResponse>)
         let dashboardSummary: any = null;
-        if (reportResult.status === 'fulfilled') {
-          dashboardSummary = reportResult.value?.data || reportResult.value;
+        if (reportResult.status === 'fulfilled' && reportResult.value) {
+          dashboardSummary = reportResult.value?.data ?? reportResult.value;
         }
 
-        // Derive Live Pending Action Tasks directly from PENDING leaves
-        const pendingActions: PendingAction[] = leaves
+        // Synthesize Pending Actions from Live Pending Leaves + existing Pending Attendance Corrections
+        const existingCorrectionActions = get().pendingActions.filter(
+          (a) => a.actionKind === 'correction'
+        );
+        const leavePendingActions: PendingAction[] = leaves
           .filter((l) => l.status === 'PENDING')
           .map((l) => ({
-            id: `leave-act-${l.leaveId}`,
+            id: `leave-${l.leaveId}`,
             code: `HR-LV-${l.leaveId}`,
-            title: `${l.leaveType} Request`,
+            title: `Review ${l.leaveType} (${l.daysCount}d)`,
             employeeName: l.employeeName,
-            badgeText: 'PENDING APPROVAL',
-            badgeType: 'warning' as const,
-            lastUpdated: l.appliedDate || l.startDate,
+            badgeText: 'Review Required',
+            badgeType: 'warning',
+            lastUpdated: l.appliedDate || 'Awaiting Action',
             actionText: 'Review Leave',
+            actionKind: 'leave',
+            leaveType: l.leaveType,
+            daysCount: l.daysCount,
           }));
+        const pendingActions: PendingAction[] = [
+          ...existingCorrectionActions,
+          ...leavePendingActions,
+        ];
 
-        // Finalize state sync
         set({
           isLoading: false,
           isGatewayConnected: true,
           gatewayError: null,
-          employees,
+          employees: hydratedEmployees,
           departments,
           jobs,
           attendance,
@@ -481,17 +748,42 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           cronHistory,
           dashboardSummary,
           pendingActions,
-          announcements: [],
+        });
+
+        // Background-hydrate individual payroll profiles so configured baseSalary overrides fallback
+        Promise.allSettled(
+          hydratedEmployees.map(async (emp) => {
+            const prof = await payrollApi.getProfile(emp.employeeId);
+            if (prof && Number(prof.baseSalary) > 0) {
+              return { employeeId: emp.employeeId, salary: Number(prof.baseSalary) };
+            }
+            return null;
+          })
+        ).then((results) => {
+          const updatesMap = new Map<number, number>();
+          results.forEach((r) => {
+            if (r.status === 'fulfilled' && r.value) {
+              updatesMap.set(r.value.employeeId, r.value.salary);
+            }
+          });
+          if (updatesMap.size > 0) {
+            set((state) => ({
+              employees: state.employees.map((e) =>
+                updatesMap.has(e.employeeId)
+                  ? { ...e, salary: updatesMap.get(e.employeeId)! }
+                  : e
+              ),
+            }));
+          }
         });
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message ||
-          err.message ||
-          'Failed to synchronize with Spring Cloud Gateway (:8080)';
         set({
           isLoading: false,
           isGatewayConnected: false,
-          gatewayError: errorMsg,
+          gatewayError: extractApiError(
+            err,
+            'Failed to synchronize with Spring Cloud Gateway (:8080)'
+          ),
         });
       }
     },
@@ -508,59 +800,100 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         const newDept: Department = {
           departmentId: res.departmentId,
           departmentName: res.departmentName,
-          description: res.description,
+          description: res.description || '',
           headCount: 0,
           leadEmployeeId: deptData.leadEmployeeId,
-          leadName: deptData.leadName || 'Department Head',
+          leadName: deptData.leadName,
           leadAvatar: deptData.leadAvatar,
-          budget: deptData.budget || 150000,
+          budget: deptData.budget || 50000,
         };
         set((state) => ({ departments: [...state.departments, newDept] }));
         return { success: true, data: newDept };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to create department on gateway.';
-        console.error('addDepartment error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to create department.') };
       }
     },
 
     updateDepartment: async (id, updates) => {
       try {
-        await departmentApi.update(id, updates);
+        const res = await departmentApi.update(id, {
+          departmentName: updates.departmentName,
+          description: updates.description,
+        });
         set((state) => ({
           departments: state.departments.map((d) =>
-            d.departmentId === id ? { ...d, ...updates } : d
+            d.departmentId === id
+              ? {
+                  ...d,
+                  ...updates,
+                  departmentName: res.departmentName ?? updates.departmentName ?? d.departmentName,
+                  description: res.description ?? updates.description ?? d.description,
+                }
+              : d
           ),
         }));
         return { success: true };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to update department on gateway.';
-        console.error('updateDepartment error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to update department.') };
       }
     },
 
     deleteDepartment: async (id) => {
-      const state = get();
-      const hasEmployees = state.employees.some((e) => e.departmentId === id);
-      if (hasEmployees) {
-        return {
-          success: false,
-          error:
-            'Cannot delete department with active assigned employees (DepartmentHasEmployeesException). Reassign staff first.',
-        };
-      }
       try {
         await departmentApi.delete(id);
         set((s) => ({ departments: s.departments.filter((d) => d.departmentId !== id) }));
         return { success: true };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to delete department from gateway.';
-        console.error('deleteDepartment error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return {
+          success: false,
+          error: extractApiError(
+            err,
+            'Cannot delete department with active assigned employees or job positions.'
+          ),
+        };
+      }
+    },
+
+    // ==========================================
+    // Job Title Mutating Actions
+    // ==========================================
+    addJobTitle: async (jobData) => {
+      try {
+        const res = await jobApi.create({
+          jobTitle: jobData.jobTitle.trim(),
+          description: jobData.description,
+          departmentId: jobData.departmentId,
+        });
+        const dept = get().departments.find((d) => d.departmentId === jobData.departmentId);
+        const created: JobTitle = {
+          jobId: res.jobId,
+          jobTitle: res.jobTitle,
+          departmentId: res.departmentId,
+          departmentName: res.departmentName || dept?.departmentName || '',
+          minSalary: jobData.minSalary,
+          maxSalary: jobData.maxSalary,
+          description: res.description,
+        };
+        set((s) => ({ jobs: [...s.jobs, created] }));
+        return { success: true, data: created };
+      } catch (err: any) {
+        return { success: false, error: extractApiError(err, 'Failed to create job title.') };
+      }
+    },
+
+    deleteJobTitle: async (id) => {
+      try {
+        await jobApi.delete(id);
+        set((s) => ({ jobs: s.jobs.filter((j) => j.jobId !== id) }));
+        return { success: true };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: extractApiError(
+            err,
+            'Cannot delete job position because it is assigned to employees or job history.'
+          ),
+        };
       }
     },
 
@@ -577,7 +910,7 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
             jobName: c.jobName,
             executionTime: c.startTime
               ? c.startTime.replace('T', ' ').substring(0, 19)
-              : (c.executionTime || ''),
+              : c.executionTime || '',
             status: c.status === 'COMPLETED' ? 'SUCCESS' : c.status,
             durationMs:
               c.durationMs ??
@@ -589,8 +922,9 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           }));
           set({ cronHistory: formatted });
         }
+        return { success: true };
       } catch (err: any) {
-        console.error('triggerCronJob error:', err.message);
+        return { success: false, error: extractApiError(err, 'Failed to trigger CRON job.') };
       }
     },
 
@@ -599,32 +933,111 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     // ==========================================
     requestAttendanceCorrection: async (reqData) => {
       try {
-        const res = await attendanceApi.requestCorrection(reqData.attendanceId, {
-          checkIn: reqData.requestedCheckIn,
-          checkOut: reqData.requestedCheckOut,
-          reason: reqData.reason,
-        });
+        const formatIso = (dateStr: string, timeStr: string) => {
+          const t = timeStr.trim();
+          if (t.includes('T')) return t;
+          const ampmMatch = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+          if (ampmMatch) {
+            let h = parseInt(ampmMatch[1], 10);
+            const m = ampmMatch[2];
+            const mer = ampmMatch[3]?.toUpperCase();
+            if (mer === 'PM' && h < 12) h += 12;
+            if (mer === 'AM' && h === 12) h = 0;
+            return `${dateStr}T${String(h).padStart(2, '0')}:${m}:00`;
+          }
+          return `${dateStr}T08:00:00`;
+        };
+
+        const role = get().currentUser.role;
+        if (
+          (role === 'ROLE_ADMIN' || role === 'ROLE_HR') &&
+          reqData.attendanceId &&
+          Number(reqData.attendanceId) < 1000000000
+        ) {
+          await attendanceApi
+            .requestCorrection(reqData.attendanceId, {
+              checkIn: formatIso(reqData.attendanceDate, reqData.requestedCheckIn),
+              checkOut: reqData.requestedCheckOut
+                ? formatIso(reqData.attendanceDate, reqData.requestedCheckOut)
+                : undefined,
+              status: 'PRESENT',
+              lateMinutes: 0,
+              reason: reqData.reason,
+            })
+            .catch(() => {});
+        }
+
         const newCorrection: AttendanceCorrection = {
           ...reqData,
           correctionId: Date.now(),
           status: 'PENDING',
           requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
         };
+
+        const newAction: PendingAction = {
+          id: `corr-${newCorrection.correctionId}`,
+          code: `HR-CORR-${String(newCorrection.correctionId).slice(-4)}`,
+          title: `Biometric Punch Dispute (${reqData.requestedCheckIn} / ${reqData.requestedCheckOut})`,
+          employeeName: reqData.employeeName,
+          badgeText: 'Dispute Pending',
+          badgeType: 'info',
+          lastUpdated: 'Just now',
+          actionText: 'Inspect Log',
+          actionKind: 'correction',
+          requestedCheckIn: reqData.requestedCheckIn,
+          requestedCheckOut: reqData.requestedCheckOut,
+        };
+
         set((state) => ({
           attendanceCorrections: [newCorrection, ...state.attendanceCorrections],
+          pendingActions: [newAction, ...state.pendingActions],
         }));
-        return { success: true, data: res };
+
+        return { success: true, data: newCorrection };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to submit punch correction request.';
-        console.error('requestAttendanceCorrection error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return {
+          success: false,
+          error: extractApiError(err, 'Failed to submit attendance correction.'),
+        };
       }
     },
 
     reviewAttendanceCorrection: async (correctionId, status) => {
+      const target = get().attendanceCorrections.find((c) => c.correctionId === correctionId);
+      if (
+        status === 'APPROVED' &&
+        target &&
+        target.attendanceId &&
+        Number(target.attendanceId) < 1000000000
+      ) {
+        const formatIso = (dateStr: string, timeStr: string) => {
+          const t = timeStr.trim();
+          if (t.includes('T')) return t;
+          const ampmMatch = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+          if (ampmMatch) {
+            let h = parseInt(ampmMatch[1], 10);
+            const m = ampmMatch[2];
+            const mer = ampmMatch[3]?.toUpperCase();
+            if (mer === 'PM' && h < 12) h += 12;
+            if (mer === 'AM' && h === 12) h = 0;
+            return `${dateStr}T${String(h).padStart(2, '0')}:${m}:00`;
+          }
+          return `${dateStr}T08:00:00`;
+        };
+        await attendanceApi
+          .requestCorrection(target.attendanceId, {
+            checkIn: formatIso(target.attendanceDate, target.requestedCheckIn),
+            checkOut: target.requestedCheckOut
+              ? formatIso(target.attendanceDate, target.requestedCheckOut)
+              : undefined,
+            status: 'PRESENT',
+            lateMinutes: 0,
+            reason: target.reason || 'Approved attendance correction',
+          })
+          .catch(() => {});
+      }
+
       set((state) => {
-        const target = state.attendanceCorrections.find((c) => c.correctionId === correctionId);
         if (!target) return state;
 
         const updatedCorrections = state.attendanceCorrections.map((c) =>
@@ -656,6 +1069,9 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         return {
           attendanceCorrections: updatedCorrections,
           attendance: updatedAttendance,
+          pendingActions: state.pendingActions.filter(
+            (a) => a.id !== `corr-${correctionId}` && !a.code.includes(String(correctionId))
+          ),
         };
       });
       return { success: true };
@@ -665,20 +1081,22 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     // Employee Mutating Actions
     // ==========================================
     addEmployee: async (empData) => {
-      try {
-        const state = get();
-        let jobId = empData.jobId;
-        if (!jobId && empData.jobTitle) {
-          const match = state.jobs.find(
-            (j) => j.jobTitle.toLowerCase() === empData.jobTitle.toLowerCase()
-          );
-          if (match) jobId = match.jobId;
-        }
-        if (!jobId) {
-          const deptJob = state.jobs.find((j) => j.departmentId === Number(empData.departmentId));
-          jobId = deptJob ? deptJob.jobId : (state.jobs[0]?.jobId || 1);
-        }
+      const state = get();
+      let jobId = empData.jobId;
+      if (!jobId && empData.jobTitle) {
+        const match = state.jobs.find(
+          (j) =>
+            j.jobTitle.trim().toLowerCase() === empData.jobTitle.trim().toLowerCase() &&
+            (!empData.departmentId || j.departmentId === Number(empData.departmentId))
+        );
+        if (match) jobId = match.jobId;
+      }
+      if (!jobId) {
+        const deptJob = state.jobs.find((j) => j.departmentId === Number(empData.departmentId));
+        jobId = deptJob ? deptJob.jobId : state.jobs[0]?.jobId || 1;
+      }
 
+      try {
         const payload = {
           firstName: empData.firstName,
           lastName: empData.lastName,
@@ -691,42 +1109,81 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         };
 
         const res = await employeeApi.create(payload);
-        const dept = state.departments.find((d) => d.departmentId === Number(empData.departmentId));
 
-        const newEmp: Employee = {
-          employeeId: res.employeeId,
-          firstName: res.firstName,
-          lastName: res.lastName,
-          email: res.email,
-          phoneNumber: empData.phoneNumber || '+855 12 345 678',
-          gender: empData.gender || 'Other',
-          dob: res.dateOfBirth || empData.dob || '1995-01-01',
-          salary: Number(empData.salary || 2500),
-          departmentId: res.departmentId,
-          departmentName: res.departmentName || dept?.departmentName || 'General',
-          jobTitle: res.jobTitle || empData.jobTitle || 'Staff',
-          status: (res.status === 'ACTIVE' ? 'Active' : (res.status || 'Active')) as any,
-          hireDate: empData.hireDate || new Date().toISOString().split('T')[0],
-          avatarUrl:
-            empData.avatarUrl ||
-            `https://images.unsplash.com/photo-${1534528741775 + (res.employeeId % 500)}?auto=format&fit=crop&w=200&q=80`,
-        };
+        // Save payroll profile if salary provided
+        if (empData.salary && Number(empData.salary) > 0) {
+          const base = Number(empData.salary);
+          payrollApi
+            .saveProfile(res.employeeId, {
+              baseSalary: base,
+              dailyRate: Number((base / 22).toFixed(2)),
+              latePenaltyPerMinute: Number((base / 22 / 480).toFixed(4)),
+            })
+            .catch(() => {});
+        }
+
+        const newEmp = normalizeEmployee({ ...res, salary: Number(empData.salary || 0) });
 
         set((s) => ({
           employees: [newEmp, ...s.employees],
+          departments: s.departments.map((d) =>
+            d.departmentId === newEmp.departmentId
+              ? { ...d, headCount: d.headCount + 1 }
+              : d
+          ),
         }));
-
         return { success: true, data: newEmp };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to register employee on gateway.';
-        console.error('addEmployee error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to register employee.') };
       }
     },
 
     updateEmployee: async (id, updates) => {
+      const state = get();
+      const existing = state.employees.find((e) => e.employeeId === id);
+
       try {
+        // Resolve jobId belonging to target department
+        const deptId = Number(updates.departmentId || existing?.departmentId || 1);
+        let jobId = updates.jobId;
+        if (!jobId && updates.jobTitle) {
+          const match = state.jobs.find(
+            (j) =>
+              j.departmentId === deptId &&
+              j.jobTitle.trim().toLowerCase() === updates.jobTitle.trim().toLowerCase()
+          );
+          jobId = match?.jobId;
+        }
+        if (!jobId) {
+          const fallbackJob = state.jobs.find((j) => j.departmentId === deptId) || state.jobs[0];
+          jobId = fallbackJob?.jobId || 1;
+        }
+
+        let updatedRes: any = null;
+
+        // 1. Update core Employee fields via PATCH /api/employees/{id}
+        if (
+          updates.firstName !== undefined ||
+          updates.lastName !== undefined ||
+          updates.email !== undefined ||
+          updates.departmentId !== undefined ||
+          updates.jobId !== undefined ||
+          updates.jobTitle !== undefined
+        ) {
+          const payload = {
+            firstName: updates.firstName ?? existing?.firstName ?? '',
+            lastName: updates.lastName ?? existing?.lastName ?? '',
+            dateOfBirth: updates.dateOfBirth || updates.dob || existing?.dob || '1995-01-01',
+            email: updates.email ?? existing?.email ?? '',
+            contractEndDate: updates.contractEndDate ?? existing?.contractEndDate ?? '2028-12-31',
+            departmentId: deptId,
+            jobId: Number(jobId),
+            jobChangeRemark: updates.jobChangeRemark || 'Profile updated',
+          };
+          updatedRes = await employeeApi.update(id, payload);
+        }
+
+        // 2. Update status via PATCH /api/employees/{id}/status if status was supplied
         if (updates.status) {
           const backendStatus =
             updates.status === 'Active'
@@ -735,35 +1192,68 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
               ? 'ON_LEAVE'
               : updates.status === 'Terminated'
               ? 'TERMINATED'
-              : updates.status;
-          await employeeApi.updateStatus(id, backendStatus);
+              : updates.status === 'Probation'
+              ? 'PROBATION'
+              : String(updates.status).toUpperCase();
+          updatedRes = await employeeApi.updateStatus(id, backendStatus);
         }
 
-        set((state) => ({
-          employees: state.employees.map((e) => (e.employeeId === id ? { ...e, ...updates } : e)),
-        }));
+        // 3. Persist updated base salary via POST /api/payroll/profiles/{employeeId} if provided
+        if (updates.salary !== undefined && Number(updates.salary) > 0) {
+          const base = Number(updates.salary);
+          await payrollApi.saveProfile(id, {
+            baseSalary: base,
+            dailyRate: Number((base / 22).toFixed(2)),
+            latePenaltyPerMinute: Number((base / 22 / 480).toFixed(4)),
+          });
+        }
 
-        return { success: true };
+        const merged = updatedRes
+          ? normalizeEmployee({ ...updatedRes, salary: updates.salary ?? existing?.salary ?? 0 })
+          : { ...existing, ...updates };
+
+        set((s) => {
+          let updatedDepts = s.departments;
+          if (existing && merged.departmentId && merged.departmentId !== existing.departmentId) {
+            updatedDepts = s.departments.map((d) => {
+              if (d.departmentId === existing.departmentId) {
+                return { ...d, headCount: Math.max(0, d.headCount - 1) };
+              }
+              if (d.departmentId === merged.departmentId) {
+                return { ...d, headCount: d.headCount + 1 };
+              }
+              return d;
+            });
+          }
+          return {
+            employees: s.employees.map((e) => (e.employeeId === id ? { ...e, ...merged } : e)),
+            departments: updatedDepts,
+          };
+        });
+
+        return { success: true, data: merged };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to update employee details on gateway.';
-        console.error('updateEmployee error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to update employee profile.') };
       }
     },
 
     deleteEmployee: async (id) => {
       try {
         await employeeApi.updateStatus(id, 'TERMINATED');
-        set((state) => ({
-          employees: state.employees.filter((e) => e.employeeId !== id),
-        }));
+        set((state) => {
+          const targetEmp = state.employees.find((e) => e.employeeId === id);
+          return {
+            employees: state.employees.filter((e) => e.employeeId !== id),
+            departments: state.departments.map((d) =>
+              targetEmp && d.departmentId === targetEmp.departmentId
+                ? { ...d, headCount: Math.max(0, d.headCount - 1) }
+                : d
+            ),
+          };
+        });
         return { success: true };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to terminate employee on gateway.';
-        console.error('deleteEmployee error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to terminate employee.') };
       }
     },
 
@@ -772,113 +1262,32 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
     // ==========================================
     recordAttendancePunch: async (type, note) => {
       try {
-        let res: AttendanceRecord;
-        if (type === 'IN') {
-          res = await attendanceApi.checkIn(note);
-        } else {
-          res = await attendanceApi.checkOut(note);
-        }
-
-        // Refresh attendance logs
-        try {
-          const refreshed = await attendanceApi.getAll();
-          if (Array.isArray(refreshed)) {
-            const state = get();
-            const formatted = refreshed.map((a: any) => {
-              const emp = state.employees.find((e) => e.employeeId === a.employeeId);
-              const formatTime = (t?: string) => {
-                if (!t) return null;
-                return t.includes('T') ? t.split('T')[1].substring(0, 5) : t.substring(0, 5);
-              };
-              return {
-                attendanceId: a.attendanceId || Date.now(),
-                employeeId: a.employeeId,
-                employeeName:
-                  a.employeeName ||
-                  (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${a.employeeId}`),
-                attendanceDate: String(a.attendanceDate || new Date().toISOString().split('T')[0]),
-                checkIn: formatTime(a.checkIn),
-                checkOut: formatTime(a.checkOut),
-                lateMinutes: a.lateMinutes || 0,
-                otHours: a.otHours || 0,
-                status: a.status || (a.lateMinutes > 0 ? 'LATE' : 'PRESENT'),
-              };
-            });
-            set({ attendance: formatted });
-          }
-        } catch {
-          // Keep response
-        }
-
+        const res =
+          type === 'IN' ? await attendanceApi.checkIn(note) : await attendanceApi.checkOut(note);
+        await get().syncWithGateway();
         return { success: true, data: res };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || `Failed to record attendance ${type}.`;
-        console.error('recordAttendancePunch error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Attendance punch failed.') };
       }
     },
 
-    checkInToday: async (employeeId) => {
-      const result = await get().recordAttendancePunch('IN');
-      if (!result.success) {
-        // Fallback optimistic record for demo / local UI
-        set((state) => {
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const dateStr = now.toISOString().split('T')[0];
-          const hour = now.getHours();
-          const minute = now.getMinutes();
-          const cutoff = 8 * 60 + 15;
-          const lateMinutes = hour * 60 + minute > cutoff ? hour * 60 + minute - cutoff : 0;
-          const emp = state.employees.find((e) => e.employeeId === employeeId);
-          const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Employee';
-          const existing = state.attendance.find(
-            (a) => a.employeeId === employeeId && a.attendanceDate === dateStr
-          );
-          let updated: AttendanceRecord[];
-          if (existing) {
-            updated = state.attendance.map((a) =>
-              a.attendanceId === existing.attendanceId
-                ? { ...a, checkIn: timeStr, lateMinutes, status: lateMinutes > 0 ? 'LATE' : 'PRESENT' }
-                : a
-            );
-          } else {
-            const newRec: AttendanceRecord = {
-              attendanceId: Date.now(),
-              employeeId,
-              employeeName: empName,
-              attendanceDate: dateStr,
-              checkIn: timeStr,
-              checkOut: null,
-              lateMinutes,
-              otHours: 0,
-              status: lateMinutes > 0 ? 'LATE' : 'PRESENT',
-            };
-            updated = [newRec, ...state.attendance];
-          }
-          return { attendance: updated };
-        });
+    checkInToday: async () => {
+      try {
+        const res = await attendanceApi.checkIn();
+        await get().syncWithGateway();
+        return { success: true, data: res };
+      } catch (err: any) {
+        return { success: false, error: extractApiError(err, 'Check-in failed.') };
       }
     },
 
-    checkOutToday: async (employeeId) => {
-      const result = await get().recordAttendancePunch('OUT');
-      if (!result.success) {
-        set((state) => {
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const dateStr = now.toISOString().split('T')[0];
-          const hour = now.getHours();
-          const minute = now.getMinutes();
-          const ot = hour >= 17 ? Math.round(((hour - 17) + minute / 60) * 10) / 10 : 0;
-          const updated = state.attendance.map((a) =>
-            a.employeeId === employeeId && a.attendanceDate === dateStr
-              ? { ...a, checkOut: timeStr, otHours: ot }
-              : a
-          );
-          return { attendance: updated };
-        });
+    checkOutToday: async () => {
+      try {
+        const res = await attendanceApi.checkOut();
+        await get().syncWithGateway();
+        return { success: true, data: res };
+      } catch (err: any) {
+        return { success: false, error: extractApiError(err, 'Check-out failed.') };
       }
     },
 
@@ -891,7 +1300,7 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           leaveType: reqData.leaveType,
           startDate: reqData.startDate,
           endDate: reqData.endDate,
-          reason: reqData.reason || 'Leave requested',
+          reason: reqData.reason || '',
         };
 
         const res = await leaveApi.apply(payload);
@@ -908,26 +1317,37 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         const newLeave: LeaveRequest = {
           leaveId: res.leaveId,
           employeeId: res.employeeId || reqData.employeeId || 1,
-          employeeName: res.employeeName || reqData.employeeName || 'Staff Member',
-          leaveType: (res.leaveType || reqData.leaveType) as any,
+          employeeName: res.employeeName || reqData.employeeName || get().currentUser.fullName,
+          leaveType: res.leaveType || reqData.leaveType,
           startDate: res.startDate || reqData.startDate,
           endDate: res.endDate || reqData.endDate,
           daysCount: daysCount || 1,
           reason: res.reason || reqData.reason || '',
-          status: (res.status || 'PENDING') as any,
-          appliedDate: new Date().toISOString().split('T')[0],
+          status: res.status || 'PENDING',
+          appliedDate: res.appliedDate || getLocalDateStr(),
+        };
+
+        const newAction: PendingAction = {
+          id: `leave-${newLeave.leaveId}`,
+          code: `HR-LV-${newLeave.leaveId}`,
+          title: `Review ${newLeave.leaveType} (${newLeave.daysCount}d)`,
+          employeeName: newLeave.employeeName,
+          badgeText: 'Awaiting Decision',
+          badgeType: 'warning',
+          lastUpdated: 'Just now',
+          actionText: 'Review Leave',
+          actionKind: 'leave',
+          leaveType: newLeave.leaveType,
+          daysCount: newLeave.daysCount,
         };
 
         set((state) => ({
           leaves: [newLeave, ...state.leaves],
+          pendingActions: [newAction, ...state.pendingActions],
         }));
-
         return { success: true, data: newLeave };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to submit leave request to gateway.';
-        console.error('submitLeaveRequest error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to submit leave request.') };
       }
     },
 
@@ -943,14 +1363,14 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
           leaves: state.leaves.map((l) =>
             l.leaveId === leaveId ? { ...l, status, approvedBy: state.currentUser.fullName } : l
           ),
+          pendingActions: state.pendingActions.filter(
+            (a) => a.id !== `leave-${leaveId}` && !a.code.includes(String(leaveId))
+          ),
         }));
 
         return { success: true };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || `Failed to ${status.toLowerCase()} leave request.`;
-        console.error('updateLeaveStatus error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to update leave status.') };
       }
     },
 
@@ -959,66 +1379,67 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
         await leaveApi.cancel(leaveId);
         set((state) => ({
           leaves: state.leaves.filter((l) => l.leaveId !== leaveId),
+          pendingActions: state.pendingActions.filter(
+            (a) => a.id !== `leave-${leaveId}` && !a.code.includes(String(leaveId))
+          ),
         }));
         return { success: true };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to cancel leave request.';
-        console.error('cancelLeaveRequest error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: extractApiError(err, 'Failed to cancel leave request.') };
       }
     },
 
     // ==========================================
     // Payroll Mutating Actions
     // ==========================================
+    fetchPayrollByPeriod: async (periodMonth) => {
+      try {
+        const ym = normalizePeriodYm(periodMonth);
+        const rawList = await payrollApi.getAll(ym);
+        const employees = get().employees;
+        const formatted = Array.isArray(rawList)
+          ? rawList.map((p: any) => formatPayrollRecord(p, employees, ym))
+          : [];
+        set({ payroll: formatted });
+        return { success: true, data: formatted };
+      } catch (err: any) {
+        return { success: false, error: extractApiError(err, 'Failed to fetch payroll period.') };
+      }
+    },
+
     generateMonthlyPayroll: async (periodMonth) => {
       try {
-        let ym = periodMonth;
-        if (!/^\d{4}-\d{2}$/.test(periodMonth)) {
-          const d = new Date(
-            periodMonth.includes(' ')
-              ? `${periodMonth.split(' ')[0]} 1, ${periodMonth.split(' ')[1]}`
-              : periodMonth
-          );
-          if (!isNaN(d.getTime())) {
-            ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          } else {
-            ym = new Date().toISOString().substring(0, 7);
-          }
-        }
-
+        const ym = normalizePeriodYm(periodMonth);
         await payrollApi.generateBatch(ym);
-
         const rawList = await payrollApi.getAll(ym);
-        const state = get();
-        const formatted: PayrollRecord[] = rawList.map((p: any) => {
-          const emp = state.employees.find((e) => e.employeeId === p.employeeId);
-          return {
-            recordId: p.payrollId || p.recordId || Date.now(),
-            employeeId: p.employeeId,
-            employeeName:
-              p.employeeName || (emp ? `${emp.firstName} ${emp.lastName}` : `Employee #${p.employeeId}`),
-            jobTitle: emp?.jobTitle || p.jobTitle || 'Staff',
-            departmentName: emp?.departmentName || p.departmentName || 'General',
-            periodMonth: String(p.period || ym),
-            baseSalary: Number(p.baseSalary || 2500),
-            allowances: Number(p.allowances || 200),
-            lateDeductions: Number(p.lateDeduction || p.lateDeductions || 0),
-            taxDeductions: Number(p.unpaidLeaveDeduction || p.taxDeductions || 0),
-            netSalary: Number(p.netSalary || p.baseSalary || 2500),
-            status: p.status || 'PROCESSED',
-            paidDate: p.paidDate || p.generatedDate,
-          };
-        });
-
+        const employees = get().employees;
+        const formatted = Array.isArray(rawList)
+          ? rawList.map((p: any) => formatPayrollRecord(p, employees, ym))
+          : [];
         set({ payroll: formatted });
         return { success: true };
       } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || err.message || 'Failed to generate monthly payroll batch.';
-        console.error('generateMonthlyPayroll error:', errorMsg);
-        return { success: false, error: errorMsg };
+        return {
+          success: false,
+          error: extractApiError(err, 'Failed to generate monthly payroll batch.'),
+        };
+      }
+    },
+
+    savePayrollProfile: async (employeeId, payload) => {
+      try {
+        await payrollApi.saveProfile(employeeId, payload);
+        set((state) => ({
+          employees: state.employees.map((e) =>
+            e.employeeId === employeeId ? { ...e, salary: Number(payload.baseSalary) } : e
+          ),
+        }));
+        return { success: true };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: extractApiError(err, 'Failed to save compensation profile.'),
+        };
       }
     },
 
@@ -1026,7 +1447,7 @@ export const useHrmsStore = create<HrmsState>((set, get) => {
       set((state) => ({
         payroll: state.payroll.map((p) =>
           p.recordId === recordId
-            ? { ...p, status: 'PAID' as const, paidDate: new Date().toISOString().split('T')[0] }
+            ? { ...p, status: 'PAID' as const, paidDate: getLocalDateStr() }
             : p
         ),
       }));
